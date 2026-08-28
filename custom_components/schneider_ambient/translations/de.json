@@ -1,4 +1,5 @@
 {
+  "title": "Schneider Ambient BLE",
   "config": {
     "flow_title": "Schneider Ambient BLE",
     "progress": {
@@ -39,6 +40,9 @@
     "abort": {
       "already_configured": "Dieses Gerät ist bereits eingerichtet.",
       "not_supported": "Das gefundene Bluetooth-Gerät wird von dieser Integration nicht unterstützt."
+    },
+    "create_entry": {
+      "success": "**{name}** wurde erfolgreich mit Schneider Ambient BLE eingerichtet."
     }
   }
 }

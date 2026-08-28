@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.8
+
+- Fixed the Home Assistant completion screen at the correct lifecycle point using `async_on_create_entry()`. The WSC device is now registered before the final config-flow result is returned to the frontend.
+- The final `ConfigFlowResult` now explicitly carries the normalized entry title instead of relying on frontend timing.
+- Added a localized `config.create_entry.success` message, so setup success no longer depends on Home Assistant's generic `Created configuration for ...` fallback.
+- Added the required top-level `title` to custom-integration translation files.
+- Added setup/finalization log lines containing the resolved title and Bluetooth address for troubleshooting.
+
 ## 0.1.7
 
 - Fixed the blank Home Assistant completion message (`Created configuration for .`) by giving manual config flows a stable title from the first step.

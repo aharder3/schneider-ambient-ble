@@ -9,8 +9,9 @@ from bleak_retry_connector import BleakClientWithServiceCache
 
 from homeassistant.components import bluetooth
 from homeassistant.components.bluetooth import BluetoothServiceInfoBleak
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
+from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult
 from homeassistant.const import CONF_ADDRESS
+from homeassistant.helpers import device_registry as dr
 
 from .ble import SchneiderAuthorizationTimeout, SchneiderBleClient
 from .const import DOMAIN, SERVICE_UUID
@@ -313,10 +314,70 @@ class SchneiderAmbientConfigFlow(ConfigFlow, domain=DOMAIN):
         title = _device_name(self._discovery_info)
         self.context["title_placeholders"] = {"name": title}
         await self._async_close_setup_client()
+
+        _LOGGER.info(
+            "Schneider Ambient BLE setup completed: title=%r address=%s",
+            title,
+            self._discovery_info.address,
+        )
+
+        # Give the create-entry screen an explicit localized success message.
+        # Home Assistant's generic fallback uses the flow result title and can
+        # otherwise render as "Created configuration for ." when the frontend
+        # has not associated a device with the just-created entry yet.
         return self.async_create_entry(
             title=title,
             data={CONF_ADDRESS: self._discovery_info.address},
+            description="success",
+            description_placeholders={"name": title},
         )
+
+    @override
+    async def async_on_create_entry(
+        self, result: ConfigFlowResult
+    ) -> ConfigFlowResult:
+        """Finalize the entry and device before the frontend renders success.
+
+        This hook runs after Home Assistant has created the ConfigEntry but before
+        the finished config-flow result is returned to the frontend. Registering
+        the device here avoids a race where the create-entry screen sees zero
+        devices and falls back to the generic "Created configuration for ..."
+        message.
+        """
+        entry = result.get("result")
+        if not isinstance(entry, ConfigEntry):
+            return result
+
+        title = normalize_device_name(entry.title)
+        address = entry.data.get(CONF_ADDRESS)
+        identifier = entry.unique_id or address or entry.entry_id
+
+        if entry.title != title:
+            self.hass.config_entries.async_update_entry(entry, title=title)
+
+        # Make the final FlowResult itself explicit as well. The frontend uses
+        # result.title in its generic completion fallback.
+        result["title"] = title
+        result["description"] = "success"
+        result["description_placeholders"] = {"name": title}
+
+        device_registry = dr.async_get(self.hass)
+        device_registry.async_get_or_create(
+            config_entry_id=entry.entry_id,
+            identifiers={(DOMAIN, identifier)},
+            connections={(dr.CONNECTION_BLUETOOTH, address)} if address else set(),
+            name=title,
+            manufacturer="Schneider",
+            model="Ambient Lighting / WSC",
+        )
+
+        _LOGGER.info(
+            "Schneider Ambient BLE final flow result: title=%r entry_id=%s address=%s",
+            title,
+            entry.entry_id,
+            address,
+        )
+        return result
 
     async def async_step_no_devices(
         self, user_input: dict[str, Any] | None = None
