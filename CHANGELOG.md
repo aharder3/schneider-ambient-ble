@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.6
+
+- Confirmed the captured connect → C6 polling → `0x55` physical-authorization → state/clock-sync flow works end-to-end in Home Assistant through an ESPHome Bluetooth Proxy.
+- Fixed config entries being created with blank or punctuation-only Bluetooth names (for example `Created configuration for .`).
+- Added automatic repair of already-created invalid config-entry titles on the next integration setup/restart.
+- Kept the BLE authorization protocol unchanged; this release only hardens naming and documents the successful real-device test.
+
 ## 0.1.5
 
 - Rebuilt the first-authorization flow from the PacketLogger capture.

@@ -14,6 +14,7 @@ from homeassistant.const import CONF_ADDRESS
 
 from .ble import SchneiderAuthorizationTimeout, SchneiderBleClient
 from .const import DOMAIN, SERVICE_UUID
+from .helpers import normalize_device_name
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -21,8 +22,8 @@ DISCOVERY_SCAN_SECONDS = 10.0
 
 
 def _device_name(discovery_info: BluetoothServiceInfoBleak) -> str:
-    """Return a useful display name for a discovered cabinet."""
-    return discovery_info.name or "Schneider Ambient"
+    """Return a stable display name for a discovered cabinet."""
+    return normalize_device_name(discovery_info.name)
 
 
 def _is_supported(discovery_info: BluetoothServiceInfoBleak) -> bool:

@@ -4,7 +4,7 @@ Experimental local Home Assistant control for Schneider Ambient Lighting / WSC m
 
 > **Status:** reverse-engineering project. Brightness and color temperature are decoded. Power/zone semantics are still experimental.
 >
-> **Current integration version: 0.1.5.** This release implements the first-authorization sequence directly from the PacketLogger trace: Home Assistant connects first, then polls characteristic C6 while you press the cabinet's physical pairing/learn button, and continues automatically only when the cabinet reports the observed `0x55` confirmation marker.
+> **Current integration version: 0.1.6.** The captured first-authorization flow is now confirmed working end-to-end through Home Assistant and an ESPHome Bluetooth Proxy. This release also fixes invalid/blank Bluetooth device names that could make Home Assistant show `Created configuration for .`.
 
 [![Open your Home Assistant instance and open HACS repository](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=aharder3&repository=schneider-ambient-ble&category=integration)
 
@@ -47,7 +47,7 @@ When updating an existing development install, use **Redownload** in HACS and ve
 contains:
 
 ```json
-"version": "0.1.5"
+"version": "0.1.6"
 ```
 
 ## ESPHome Bluetooth Proxy
@@ -134,7 +134,7 @@ Decoded controls:
 - Color temperature: Kelvin value, duplicated big-endian 16-bit value.
 - Power/zones: experimental.
 
-The capture shows `CE = AF 01` later, immediately before interactive brightness/color-temperature groups. For C2/C3 interaction, the app then writes C6=`01 00 03 00` before the actual value. Version 0.1.5 mirrors that preamble for brightness/CCT control.
+The capture shows `CE = AF 01` later, immediately before interactive brightness/color-temperature groups. For C2/C3 interaction, the app then writes C6=`01 00 03 00` before the actual value. Version 0.1.6 retains that captured preamble for brightness/CCT control.
 
 See [`docs/protocol.md`](docs/protocol.md).
 

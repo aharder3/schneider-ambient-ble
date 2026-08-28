@@ -100,7 +100,7 @@ The capture establishes the following sequence with high confidence:
 10. Write current time to C5.
 11. The app is now in its normal control session.
 
-This is the flow implemented in integration version 0.1.5.
+This is the flow implemented in integration version 0.1.6 and has been confirmed working end-to-end through Home Assistant with an ESPHome Bluetooth Proxy.
 
 ### Control-group preamble
 
