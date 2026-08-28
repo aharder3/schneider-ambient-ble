@@ -1,14 +1,20 @@
 # Changelog
 
+## 0.1.4
+
+- Corrected the pairing/learn sequence: Home Assistant now discovers and **connects to WSC first**.
+- The physical pairing/learn-button prompt is shown only after a real Bluetooth/GATT connection succeeds.
+- Keeps the setup connection open while the confirmation dialog is shown, with a 90-second cleanup watchdog.
+- After the user presses the cabinet button and confirms, Home Assistant sends the observed Schneider application initialization (`C4` date, `C5` time, `CE = AF 01`).
+- If the setup link drops while the user is at the button prompt, the integration reconnects before initialization.
+- Discovery and connection failures no longer instruct the user to press the cabinet button prematurely.
+- Standard BLE `pair()` is still intentionally not called because the available capture contains no SMP pairing exchange or WSC link-encryption-change event.
+
 ## 0.1.3
 
-- Reworked the complete manual setup order so the physical pairing/learn button is pressed **before** Home Assistant scans.
-- Added a visible scan progress step instead of immediately aborting when no cached device is present.
-- Added retry screens for both discovery and connection failures.
-- Added a real connection test before creating the Home Assistant config entry.
-- Replays the non-secret Schneider app initialization observed in PacketLogger: local date (`C4`), local time (`C5`) and `AF 01` (`CE`).
-- Deliberately does **not** call standard BLE `pair()` because the capture contains no SMP pairing exchange or link-encryption event for WSC.
-- Runtime writes now initialize each newly opened BLE session before sending the requested command.
+- Reworked manual setup with a visible scan progress step and explicit connection verification.
+- Added retry screens for discovery and connection failures.
+- Added replay of the observed non-secret Schneider initialization.
 
 ## 0.1.2
 

@@ -2,32 +2,33 @@
   "config": {
     "flow_title": "{name}",
     "progress": {
-      "scanning": "Scanning for Schneider/WSC devices after the physical button press",
-      "connecting": "Connecting to the mirror cabinet and replaying the observed Schneider session initialization"
+      "scanning": "Searching for a connectable Schneider/WSC device",
+      "connecting": "Connecting to the mirror cabinet before the pairing/learn step",
+      "initializing": "Applying the observed Schneider session initialization after the physical button confirmation"
     },
     "step": {
-      "prepare_pairing": {
-        "title": "Put the mirror cabinet into pairing mode",
-        "description": "Before Home Assistant scans, press the physical pairing/learn button on the light or mirror cabinet now. Keep the device powered and close to the Bluetooth proxy, then press **Continue**. Home Assistant will immediately run a fresh active Bluetooth scan.\n\nPacketLogger shows no standard BLE SMP pairing in the captured Schneider app session, so Home Assistant does not call Bluetooth `pair()`. The physical button is treated as a device-side discovery/authorization step."
-      },
       "select_device": {
         "title": "Select Schneider/WSC device",
-        "description": "More than one compatible device was found during the fresh scan. Select the mirror cabinet you want to add.",
+        "description": "More than one compatible device was discovered. Select the mirror cabinet you want to add. Home Assistant will connect to it before asking you to press the physical pairing/learn button.",
         "data": {
           "address": "Device"
         }
       },
-      "bluetooth_confirm": {
-        "title": "Set up {name}",
-        "description": "Home Assistant automatically discovered **{name}**. If you have not already done so, press the physical pairing/learn button on the light or mirror cabinet, then press **Continue**. Home Assistant will verify the GATT connection before saving the device."
+      "pairing_confirm": {
+        "title": "Connection established — press the pairing/learn button",
+        "description": "Home Assistant has successfully established a Bluetooth/GATT connection to **{name}**. **Now press the physical pairing/learn button on the light or mirror cabinet.** After pressing the button, choose **Continue**. Home Assistant will then send the application-level initialization observed in the Schneider app capture.\n\nThe captured session shows no standard BLE SMP pairing exchange, so the integration does not call Bluetooth `pair()`. The button is treated as a device-side authorization/learn step that occurs only after the connection has been established."
       },
       "no_devices": {
         "title": "No Schneider/WSC device found",
-        "description": "The fresh Bluetooth scan did not see a compatible Schneider/WSC device. Check that a connectable Bluetooth adapter or ESPHome Bluetooth Proxy is online and close to the mirror cabinet. Press the physical pairing/learn button on the cabinet, then choose **Retry** to start a new scan."
+        "description": "Home Assistant could not discover a compatible Schneider/WSC device before the pairing step. Make sure the cabinet is powered and a connectable Bluetooth adapter or ESPHome Bluetooth Proxy is online and nearby, then choose **Retry**. Do not press the cabinet's pairing/learn button yet; Home Assistant will ask for it only after a Bluetooth connection succeeds."
       },
       "connect_failed": {
-        "title": "Could not initialize the mirror cabinet",
-        "description": "Home Assistant found the device but could not complete the connection and the observed Schneider initialization sequence. Press the physical pairing/learn button again, make sure the ESPHome Bluetooth Proxy is online and nearby, then choose **Retry**. No configuration entry was saved."
+        "title": "Could not connect to the mirror cabinet",
+        "description": "Home Assistant discovered the Schneider/WSC device but could not establish the Bluetooth/GATT connection. Check that the ESPHome Bluetooth Proxy is online and close to the cabinet, then choose **Retry**. Do not press the pairing/learn button yet — the button prompt is shown only after the connection succeeds."
+      },
+      "initialize_failed": {
+        "title": "Authorization/initialization did not complete",
+        "description": "Home Assistant connected successfully and you confirmed the physical button press, but the observed Schneider initialization could not be completed. Choose **Retry** to establish a fresh Bluetooth connection; Home Assistant will then ask you to press the pairing/learn button again. No configuration entry was saved."
       }
     },
     "abort": {

@@ -4,7 +4,7 @@ Experimental local Home Assistant control for Schneider Ambient Lighting / WSC m
 
 > **Status:** experimental reverse-engineering project. Brightness and color temperature are decoded. Power/zone semantics are still being validated.
 >
-> **Current integration version: 0.1.3.** This release rebuilds the setup process so the physical pairing/learn button is pressed **before** the Bluetooth scan, then Home Assistant verifies the GATT connection and replays the observed Schneider session initialization before saving the device.
+> **Current integration version: 0.1.4.** This release corrects the setup order: Home Assistant discovers and connects to the WSC cabinet first, and only after that successful GATT connection does it ask you to press the physical pairing/learn button.
 
 [![Open your Home Assistant instance and open HACS repository](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=aharder3&repository=schneider-ambient-ble&category=integration)
 
@@ -41,28 +41,22 @@ Use the button above to open this repository in HACS.
 9. Install it.
 10. Restart Home Assistant.
 
-If an older version was already installed, use **Redownload** in HACS and restart Home Assistant completely. Verify that `custom_components/schneider_ambient/manifest.json` reports version `0.1.3`.
+If an older version was already installed, use **Redownload** in HACS and restart Home Assistant completely. Verify that `custom_components/schneider_ambient/manifest.json` reports version `0.1.4`.
 
 ## Setup process in Home Assistant
 
-Version 0.1.3 intentionally changes the manual setup order.
+Version 0.1.4 follows the observed setup order:
 
-1. Make sure the ESPHome Bluetooth Proxy is online and close to the mirror cabinet.
-2. Go to **Settings → Devices & services → Add integration → Schneider Ambient BLE**.
-3. Home Assistant first shows the physical-button instruction.
-4. Press the physical **pairing/learn button on the light or mirror cabinet**.
-5. Immediately press **Continue** in Home Assistant.
-6. Home Assistant runs a fresh active Bluetooth scan for about 12 seconds.
-7. If exactly one compatible `WSC` device is found, it is selected automatically. If more than one is found, choose the correct device.
-8. Home Assistant connects to the device through the best available local adapter or ESPHome Bluetooth Proxy.
-9. Before saving the entry, the integration replays the non-secret initialization observed in PacketLogger:
-   - current local date → characteristic `C4` as `YY MM DD`
-   - current local time → characteristic `C5` as `HH MM SS`
-   - `AF 01` → characteristic `CE`
-10. The config entry is created only if the connection and initialization succeed.
-11. If discovery or connection fails, the flow stays open and offers a retry instead of aborting.
+1. Start the Schneider Ambient BLE setup.
+2. Home Assistant searches for an already-advertising `WSC` device.
+3. If several compatible devices are found, select the correct cabinet.
+4. Home Assistant establishes a real Bluetooth/GATT connection **before** showing any pairing-button instruction.
+5. Only after the connection succeeds, Home Assistant asks you to press the physical **pairing/learn button** on the light or mirror cabinet.
+6. Press the button, then press **Continue** in Home Assistant.
+7. Home Assistant sends the observed Schneider application initialization: local date to `C4`, local time to `C5`, and `AF 01` to `CE`.
+8. The device is saved only if the full sequence succeeds.
 
-Automatic Bluetooth discovery is still supported. If Home Assistant discovers a compatible `WSC` advertisement itself, it asks for confirmation and tests the connection before saving the device.
+The setup connection is kept open while the button dialog is visible when possible. If it drops, Home Assistant reconnects before the initialization step.
 
 ## Why there is no standard BLE `pair()` call
 
