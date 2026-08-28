@@ -21,7 +21,7 @@
         }
       },
       "press_button": {
-        "title": "Bluetooth connected \u2014 press the cabinet button now",
+        "title": "Bluetooth connected — press the cabinet button now",
         "description": "Home Assistant is already connected to the Schneider/WSC cabinet and has confirmed the initial C6 state is not authorized. **Now press the physical pairing/learn button on the light or mirror cabinet.** After pressing the physical button, click **Continue**. Home Assistant will then verify that C6 changed to `0x55`."
       },
       "no_devices": {
@@ -51,6 +51,24 @@
     },
     "create_entry": {
       "success": "**{name}** was successfully configured with Schneider Ambient BLE."
+    }
+  },
+  "entity": {
+    "light": {
+      "upper_light": {
+        "name": "Upper light"
+      },
+      "lower_light": {
+        "name": "Lower light"
+      }
+    },
+    "switch": {
+      "automatic_mode": {
+        "name": "Automatic / HCL"
+      },
+      "nightlight_mode": {
+        "name": "Night light"
+      }
     }
   }
 }

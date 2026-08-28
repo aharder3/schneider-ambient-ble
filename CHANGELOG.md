@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.2.1
+
+- Added two separate on/off-only Home Assistant light entities for the cabinet's two physical light zones. Brightness and color temperature remain global on the master light.
+- Corrected Automatic/HCL C6 decoding from the earlier `0x03` hypothesis to the newly captured `02 00 00 <zone-mask>` format.
+- Added zone-aware C6 state handling: manual mode uses byte 2 (`01 00 01/02/03 00`), Automatic/HCL uses byte 3 (`02 00 00 01/02/03`).
+- Added an experimental Night-light switch using the captured `C6 = 00 00 00 02` command/state.
+- Zone switching preserves Automatic/HCL mode when possible; manual brightness/CCT changes exit HCL/Night-light mode and apply globally to both main lights.
+- Updated protocol notes from the second sanitized PacketLogger capture.
+- Expanded the README's Schneider Ambient Lighting App replacement section to include separate two-light switching, HCL and Night-light control.
+
+## 0.2.0
+
+- Replaced the separate brightness/color-temperature Number entities and disabled experimental power switch with one native Home Assistant `light` entity.
+- The light entity now exposes on/off, brightness and tunable-white color temperature (2000–6500 K).
+- Added an enabled-by-default `Automatic mode` switch using the observed C6 manual/automatic mode toggle (`01 00 03 00` ↔ `03 00 03 00`). Automatic/HCL mode remains protocol-inferred until independently verified from macOS.
+- Manual brightness/CCT changes explicitly use the manual C6 preamble and update the shared Automatic-mode state to off.
+- Added shared runtime state so the light and Automatic-mode switch stay synchronized in Home Assistant.
+- Cleans up legacy development Number / experimental Power entities from the entity registry.
+- README now positions the project as an independent local Home Assistant alternative for the core controls of the Schneider Ambient Lighting App and links to Schneider's official app page.
+
 ## 0.1.9
 
 - Confirmed color-temperature control directly from macOS against a real WSC cabinet at both 3000 K and 6500 K, including exact C2 read-back.

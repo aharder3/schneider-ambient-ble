@@ -2,7 +2,7 @@ DOMAIN = "schneider_ambient"
 
 SERVICE_UUID = "b35d95c0-6a68-437e-abe7-0ebffd8e0661"
 
-# Proprietary Schneider/WSC characteristics discovered in the capture.
+# Proprietary Schneider/WSC characteristics discovered in PacketLogger captures.
 CHAR_DEVICE_INFO = "b35d95c1-6a68-437e-abe7-0ebffd8e0661"
 CHAR_CCT = "b35d95c2-6a68-437e-abe7-0ebffd8e0661"
 CHAR_BRIGHTNESS = "b35d95c3-6a68-437e-abe7-0ebffd8e0661"
@@ -19,15 +19,39 @@ CHAR_CF = "b35d95cf-6a68-437e-abe7-0ebffd8e0661"
 CHAR_D0 = "b35d95d0-6a68-437e-abe7-0ebffd8e0661"
 CHAR_D1 = "b35d95d1-6a68-437e-abe7-0ebffd8e0661"
 
-# In the captured first-authorization flow C6 reads return
-#   01 00 03 00 00 00 00 00
-# until the physical cabinet button is pressed. The next poll returns
-#   01 55 03 00 00 00 00 00
-# and the official app immediately continues setup.
+# First physical authorization marker observed in C6 byte 1.
 AUTHORIZATION_MARKER = 0x55
 AUTHORIZATION_BYTE_INDEX = 1
 
+# Repeated control/session command observed around interactive operations.
 SESSION_INIT = bytes([0xAF, 0x01])
-CONTROL_ALL_ON = bytes([0x01, 0x00, 0x03, 0x00])
 
-PLATFORMS = ["number", "switch"]
+# Manual C6 mode: byte 2 is the two-light zone mask.
+ZONE_1 = 0x01
+ZONE_2 = 0x02
+ZONE_ALL = ZONE_1 | ZONE_2
+
+# Physical naming is currently mapped as Zone 1 = upper and Zone 2 = lower.
+# The zone-mask behavior itself is capture-confirmed; if a cabinet has reversed
+# physical wiring these two constants are the only mapping that needs swapping.
+ZONE_UPPER = ZONE_1
+ZONE_LOWER = ZONE_2
+
+CONTROL_OFF = bytes([0x00, 0x00, 0x00, 0x00])
+CONTROL_NIGHTLIGHT = bytes([0x00, 0x00, 0x00, 0x02])
+
+# Manual mode stores the active light mask in C6 byte 2.
+CONTROL_MANUAL_ZONE_1 = bytes([0x01, 0x00, ZONE_1, 0x00])
+CONTROL_MANUAL_ZONE_2 = bytes([0x01, 0x00, ZONE_2, 0x00])
+CONTROL_MANUAL_ALL_ON = bytes([0x01, 0x00, ZONE_ALL, 0x00])
+
+# Automatic/HCL mode stores the active light mask in C6 byte 3.
+# Captured examples: 02 00 00 02 and 02 00 00 03.
+CONTROL_AUTO_ZONE_1 = bytes([0x02, 0x00, 0x00, ZONE_1])
+CONTROL_AUTO_ZONE_2 = bytes([0x02, 0x00, 0x00, ZONE_2])
+CONTROL_AUTO_ALL_ON = bytes([0x02, 0x00, 0x00, ZONE_ALL])
+
+# Backwards-compatible alias used by older code/docs.
+CONTROL_ALL_ON = CONTROL_MANUAL_ALL_ON
+
+PLATFORMS = ["light", "switch"]

@@ -2,16 +2,31 @@
 
 Experimental local Home Assistant control for Schneider Ambient Lighting / WSC mirrors and mirror cabinets over Bluetooth Low Energy.
 
-## Confirmed on real hardware
+## Home Assistant alternative to the Schneider app
 
-The proprietary C2 color-temperature path has now been independently verified directly from macOS against a real WSC cabinet. The confirmed control sequence is `CE = AF 01` → `C6 = 01 00 03 00` → C2 write. C2 is 8 bytes on the tested device (four big-endian 16-bit Kelvin slots). Both 3000 K (`0B B8` repeated four times) and 6500 K (`19 64` repeated four times) were written and read back successfully.
+This project is intended as an independent, local Home Assistant replacement/alternative for the everyday Bluetooth lighting controls of the **Schneider Ambient Lighting App**: separate two-light switching, master power, brightness, tunable-white color temperature, Automatic/HCL and Night-light mode.
 
-Version 0.1.9 also changes first authorization to a visible Home Assistant form: HA connects first and confirms C6 is non-authorized, then the user is explicitly told to press the physical cabinet button and click Continue; HA only proceeds after C6 returns `0x55`.
+Official Schneider app information: <https://www.wschneider.com/ch/de/wussten-sie/licht-sich-wohlfuehlen-im-raum/schneider-app/>
 
+The official app remains the reference implementation and may expose additional model-specific functions such as HCL schedules, night-light settings or saved ambience profiles. This project is not affiliated with or endorsed by W. Schneider+Co AG.
 
-> **Status:** reverse-engineering project. Brightness and color temperature are decoded. Power/zone semantics are still experimental.
+## Confirmed / implemented controls
+
+Version 0.2.1 exposes the controls observed on a two-light Schneider/WSC cabinet:
+
+- **Master light**: both main lights on/off together, global brightness and global tunable-white color temperature.
+- **Upper light**: separate on/off only.
+- **Lower light**: separate on/off only.
+- **Brightness**: 10–100 % through the normal HA light brightness control; it applies to both main lights.
+- **Light color / color temperature**: 2000–6500 K; it applies to both main lights. The C2 write path is independently verified on real hardware from macOS at 3000 K and 6500 K, including read-back.
+- **Automatic / HCL**: separate switch using the newly captured C6 automatic format (`02 00 00 <zone-mask>`).
+- **Night light**: separate switch using the captured C6 night-light command/state candidate `00 00 00 02`.
+
+The second PacketLogger capture confirms that manual mode stores the two-light mask in C6 byte 2 (`01 00 01 00`, `01 00 02 00`, `01 00 03 00`) while Automatic/HCL stores it in byte 3 (`02 00 00 02`, `02 00 00 03`). Manual brightness or color-temperature changes deliberately leave Automatic/HCL and Night-light mode.
+
+> **Status:** reverse-engineering project. Color temperature is independently real-hardware verified. Separate-zone C6 values and the Automatic/HCL `0x02` format are directly observed in the official-app capture. The immediate Night-light C6 state is implemented from the capture and should still be treated as experimental until independently replayed from macOS.
 >
-> **Current integration version: 0.1.9.** This release uses the real-hardware-verified C2 payload shape, performs read-back verification, and changes first authorization to a persistent visible button form: connect first → confirm C6 is non-authorized → ask the user to press the cabinet button → Continue → verify C6=`0x55`.
+> **Current integration version: 0.2.1.** Home Assistant exposes one master light, two on/off-only zone lights, an Automatic/HCL switch and a Night-light switch.
 
 [![Open your Home Assistant instance and open HACS repository](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=aharder3&repository=schneider-ambient-ble&category=integration)
 
@@ -54,8 +69,20 @@ When updating an existing development install, use **Redownload** in HACS and ve
 contains:
 
 ```json
-"version": "0.1.9"
+"version": "0.2.1"
 ```
+
+## Home Assistant controls
+
+After setup the device page should contain five active controls:
+
+1. **Schneider Ambient** (`light`) — master on/off, global brightness and 2000–6500 K color temperature.
+2. **Upper light** (`light`) — on/off only.
+3. **Lower light** (`light`) — on/off only.
+4. **Automatic / HCL** (`switch`) — changes between manual and captured HCL mode while preserving the current zone mask.
+5. **Night light** (`switch`) — activates/deactivates the captured night-light mode.
+
+Brightness and color temperature are intentionally only present on the master light because the tested cabinet applies those values globally to both main lights. The old development entities `Brightness`, `Color temperature` and `Power (experimental)` are removed from the entity registry so they do not remain as duplicates.
 
 ## ESPHome Bluetooth Proxy
 
@@ -77,7 +104,7 @@ Keep Wi-Fi credentials, API keys and OTA passwords in your local `secrets.yaml`;
 
 ### Home Assistant setup behavior
 
-Version 0.1.9 deliberately separates the physical authorization into a normal Home Assistant form instead of a background progress message. The form is only shown after the Bluetooth/GATT connection is established and C1 plus the initial non-authorized C6 value have been read successfully. The user then presses the physical cabinet button and clicks **Continue**; Home Assistant verifies C6=`0x55` before running the post-authorization reads and clock sync.
+Version 0.2.1 retains the physical authorization as a normal Home Assistant form instead of a background progress message. The form is only shown after the Bluetooth/GATT connection is established and C1 plus the initial non-authorized C6 value have been read successfully. The user then presses the physical cabinet button and clicks **Continue**; Home Assistant verifies C6=`0x55` before running the post-authorization reads and clock sync.
 
 ## First authorization / pairing flow
 
@@ -133,6 +160,11 @@ C2 → repeated Kelvin payload
 C2 → read-back verification
 ```
 
+
+### Direct power / Automatic-mode verification helper
+
+For protocol testing from macOS, [`tools/wsc_power_mode_mac.py`](tools/wsc_power_mode_mac.py) and [`tools/wsc_zone_mode_mac.py`](tools/wsc_zone_mode_mac.py) can replay the sanitized C6 states and print the read-back. The Night-light write remains marked experimental until it has also been independently replayed outside the Schneider app.
+
 ## Protocol knowledge
 
 Primary proprietary service:
@@ -157,9 +189,9 @@ Decoded controls:
 
 - Brightness: 0–100 % maps to 0–10000, duplicated big-endian 16-bit value.
 - Color temperature: Kelvin value, duplicated big-endian 16-bit value.
-- Power/zones: experimental.
+- Power/zones: separate manual zone masks are capture-confirmed; Automatic/HCL uses the captured `0x02` format; Night-light mode is still experimental for direct replay.
 
-The capture shows `CE = AF 01` later, immediately before interactive brightness/color-temperature groups. For C2/C3 interaction, the app then writes C6=`01 00 03 00` before the actual value. Version 0.1.6 retains that captured preamble for brightness/CCT control.
+The capture shows `CE = AF 01` later, immediately before interactive brightness/color-temperature groups. For C2/C3 interaction, the app then writes C6=`01 00 03 00` before the actual value. Version 0.2.1 retains that captured preamble for manual brightness/CCT control.
 
 See [`docs/protocol.md`](docs/protocol.md).
 
