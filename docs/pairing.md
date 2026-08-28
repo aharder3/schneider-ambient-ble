@@ -1,46 +1,36 @@
-# Physical pairing / learn-button behavior
+# Pairing / first authorization
 
-## Observed setup order
+The current capture shows a proprietary **connect first, then physical-button authorization** flow. It does **not** show standard BLE SMP pairing/bonding.
 
-The important ordering for the Schneider/WSC setup is:
+## Captured sequence
 
-1. The WSC device is discovered over Bluetooth.
-2. The controller establishes a Bluetooth LE / GATT connection to the cabinet.
-3. **Only after the connection is established** is the user asked to press the physical pairing/learn button on the light or mirror cabinet.
-4. The user presses the physical button and confirms in the UI.
-5. The application-level Schneider initialization continues over the established connection.
+The WSC connection is established first. The app completes GATT discovery and reads characteristic C1. It then repeatedly reads characteristic C6 approximately every 0.5 seconds while waiting for the user to press the physical button on the cabinet.
 
-Version 0.1.4 implements this ordering in Home Assistant.
+Observed C6 values:
 
-## What the PacketLogger capture shows
+```text
+17:59:50.467  C6 -> 01 00 03 00 00 00 00 00
+17:59:51.067  C6 -> 01 00 03 00 00 00 00 00
+17:59:51.608  C6 -> 01 00 03 00 00 00 00 00
+17:59:52.297  C6 -> 01 00 03 00 00 00 00 00
+17:59:52.837  C6 -> 01 00 03 00 00 00 00 00
+17:59:53.377  C6 -> 01 55 03 00 00 00 00 00  <-- physical button confirmed
+```
 
-For the captured WSC connection, the trace shows a normal LE connection, ATT/GATT setup, state reads, and application writes. In particular, the app writes:
+The `0x55` byte is therefore used by this integration as the observed device-side authorization marker. Home Assistant does not ask the user to press Continue. It keeps the GATT connection open, polls C6, and advances automatically when the cabinet reports `0x55`.
 
-- local date to characteristic `C4` as `YY MM DD`
-- local time to characteristic `C5` as `HH MM SS`
-- `AF 01` to characteristic `CE`
+## After the button is confirmed
 
-Brightness, color-temperature and power/zone commands follow later.
+The official app reads the current state in this order:
 
-The captured session does **not** contain a Bluetooth Security Manager (SMP) pairing exchange on L2CAP CID `0x0006`, and it does **not** show an HCI link-encryption-change event for the WSC connection. Therefore the project does not claim that the observed button step is standard BLE bonding.
+```text
+C1, C4, C5, CB, C2, C3, C6, C8, C6, C9, CA, D0, D1
+```
 
-## Home Assistant 0.1.4 setup sequence
+It then writes the current local date to C4 (`YY MM DD`) and the current local time to C5 (`HH MM SS`).
 
-1. Make sure the ESPHome Bluetooth Proxy is online and near the cabinet.
-2. Start **Settings → Devices & services → Add integration → Schneider Ambient BLE**.
-3. Home Assistant performs a fresh Bluetooth discovery scan **without asking for the physical button yet**.
-4. If one WSC device is found it is selected automatically; if several are found, choose the correct one.
-5. Home Assistant establishes a real GATT connection to the selected WSC device.
-6. **Only after that connection succeeds**, Home Assistant shows the pairing/learn-button confirmation screen.
-7. Press the physical pairing/learn button on the light or mirror cabinet.
-8. Press **Continue** in Home Assistant.
-9. Home Assistant sends the observed application-level initialization (`C4` date, `C5` time, `CE = AF 01`).
-10. The config entry is created only if the full sequence succeeds.
+`CE = AF 01` occurs later, at the start of interactive control groups, not during the physical-button authorization itself.
 
-Home Assistant attempts to keep the setup GATT connection open while the button dialog is visible. A watchdog closes an abandoned connection after 90 seconds. If the link drops while the user is pressing the button, the integration reconnects automatically before sending the initialization, but the button prompt is still never shown until at least one real GATT connection has succeeded.
+## What the capture does not show
 
-## Why `BleakClient.pair()` is not called
-
-The physical button is currently treated as a **device-side learn/authorization step** because the recorded Schneider app session contains no standard SMP pairing transaction. Calling `BleakClient.pair()` would introduce a BLE security exchange that is not supported by the evidence in the capture.
-
-A clean first-registration capture can still reveal whether Schneider performs an additional proprietary authorization write that was absent from the existing session.
+There is no observed BLE SMP Pairing Request/Response on L2CAP CID `0x0006`, and no encryption-change event for this WSC link. Therefore the integration deliberately does not call `BleakClient.pair()`.

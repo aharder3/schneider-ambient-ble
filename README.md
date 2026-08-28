@@ -2,9 +2,9 @@
 
 Experimental local Home Assistant control for Schneider Ambient Lighting / WSC mirrors and mirror cabinets over Bluetooth Low Energy.
 
-> **Status:** experimental reverse-engineering project. Brightness and color temperature are decoded. Power/zone semantics are still being validated.
+> **Status:** reverse-engineering project. Brightness and color temperature are decoded. Power/zone semantics are still experimental.
 >
-> **Current integration version: 0.1.4.** This release corrects the setup order: Home Assistant discovers and connects to the WSC cabinet first, and only after that successful GATT connection does it ask you to press the physical pairing/learn button.
+> **Current integration version: 0.1.5.** This release implements the first-authorization sequence directly from the PacketLogger trace: Home Assistant connects first, then polls characteristic C6 while you press the cabinet's physical pairing/learn button, and continues automatically only when the cabinet reports the observed `0x55` confirmation marker.
 
 [![Open your Home Assistant instance and open HACS repository](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=aharder3&repository=schneider-ambient-ble&category=integration)
 
@@ -26,45 +26,29 @@ The ESP32 stays a generic connectable Bluetooth Proxy. Schneider-specific setup 
 
 ### One-click
 
-Use the button above to open this repository in HACS.
+Use the HACS button above.
 
-### Manual HACS installation
+### Manual installation
 
-1. Open **HACS** in Home Assistant.
-2. Open **Integrations**.
-3. Open the menu in the top-right corner.
-4. Choose **Custom repositories**.
-5. Repository: `https://github.com/aharder3/schneider-ambient-ble`
-6. Type/category: **Integration**.
-7. Click **Add**.
-8. Search for **Schneider Ambient BLE**.
-9. Install it.
-10. Restart Home Assistant.
+1. Open **HACS → Integrations**.
+2. Open the menu in the top-right corner.
+3. Choose **Custom repositories**.
+4. Repository: `https://github.com/aharder3/schneider-ambient-ble`
+5. Category: **Integration**.
+6. Add and install **Schneider Ambient BLE**.
+7. Restart Home Assistant completely.
 
-If an older version was already installed, use **Redownload** in HACS and restart Home Assistant completely. Verify that `custom_components/schneider_ambient/manifest.json` reports version `0.1.4`.
+When updating an existing development install, use **Redownload** in HACS and verify:
 
-## Setup process in Home Assistant
+```text
+/config/custom_components/schneider_ambient/manifest.json
+```
 
-Version 0.1.4 follows the observed setup order:
+contains:
 
-1. Start the Schneider Ambient BLE setup.
-2. Home Assistant searches for an already-advertising `WSC` device.
-3. If several compatible devices are found, select the correct cabinet.
-4. Home Assistant establishes a real Bluetooth/GATT connection **before** showing any pairing-button instruction.
-5. Only after the connection succeeds, Home Assistant asks you to press the physical **pairing/learn button** on the light or mirror cabinet.
-6. Press the button, then press **Continue** in Home Assistant.
-7. Home Assistant sends the observed Schneider application initialization: local date to `C4`, local time to `C5`, and `AF 01` to `CE`.
-8. The device is saved only if the full sequence succeeds.
-
-The setup connection is kept open while the button dialog is visible when possible. If it drops, Home Assistant reconnects before the initialization step.
-
-## Why there is no standard BLE `pair()` call
-
-The available PacketLogger capture shows a normal LE connection, GATT discovery, state reads and application writes. It does **not** contain a Bluetooth Security Manager pairing exchange on L2CAP CID `0x0006`, and it does not show a link-encryption-change event for the WSC connection.
-
-Therefore the physical button is currently treated as a **device-side pairing/learn/authorization step**, not as proof of standard BLE bonding. The integration deliberately does not invent a `BleakClient.pair()` call that the captured Schneider app session did not perform.
-
-See [`docs/pairing.md`](docs/pairing.md) for the detailed evidence and capture procedure.
+```json
+"version": "0.1.5"
+```
 
 ## ESPHome Bluetooth Proxy
 
@@ -81,78 +65,98 @@ bluetooth_proxy:
   active: true
 ```
 
-Keep Wi-Fi credentials, API keys and OTA passwords in your local `secrets.yaml` and never commit that file.
+Keep Wi-Fi credentials, API keys and OTA passwords in your local `secrets.yaml`; never commit them.
 
-## Experimental direct ESPHome control
+## First authorization / pairing flow
 
-[`esphome/direct_control_experimental.yaml`](esphome/direct_control_experimental.yaml) contains an alternative where the ESP32 connects to the cabinet itself while still acting as a Bluetooth Proxy.
+The PacketLogger trace makes the setup order clear:
 
-This option requires a local BLE address and is intentionally not preconfigured with a real device address. The Home Assistant integration is the recommended path because it can use Home Assistant's Bluetooth routing and any suitable ESPHome proxy.
+```text
+Discover WSC
+   ↓
+Connect Bluetooth/GATT
+   ↓
+Complete GATT discovery
+   ↓
+Read C1
+   ↓
+Poll C6 every ~0.5 s
+   ↓
+01 00 03 00 00 00 00 00   waiting
+   ↓ physical cabinet button
+01 55 03 00 00 00 00 00   confirmed
+   ↓
+Read current cabinet state
+   ↓
+Write current date to C4
+Write current time to C5
+   ↓
+Create Home Assistant entry
+```
 
-## Current protocol knowledge
+During setup, Home Assistant therefore behaves like the captured Schneider app:
 
-The proprietary service observed during reverse engineering is:
+1. It finds WSC.
+2. It establishes the Bluetooth/GATT connection **before** asking for the physical button.
+3. Once connected, the setup screen tells you to press the physical pairing/learn button.
+4. Home Assistant keeps the connection open and reads C6 every 0.5 seconds.
+5. There is **no Continue button to confirm the physical press**. The cabinet itself confirms it by changing C6 from the observed `0x00` state to `0x55`.
+6. Home Assistant then reads the current state and synchronizes date/time.
+7. The config entry is created only if the sequence succeeds.
+
+The trace contains no BLE SMP Pairing Request/Response on L2CAP CID `0x0006` and no link-encryption transition for WSC. The integration therefore does not invent a standard `BleakClient.pair()` operation.
+
+See [`docs/pairing.md`](docs/pairing.md) for packet-level evidence.
+
+## Protocol knowledge
+
+Primary proprietary service:
 
 ```text
 B35D95C0-6A68-437E-ABE7-0EBFFD8E0661
 ```
 
-Observed characteristics currently used by the project:
+Important characteristics:
 
-```text
-C2  color temperature
-C3  brightness
-C4  local date (YY MM DD)
-C5  local time (HH MM SS)
-C6  power / zones (experimental)
-CE  AF 01 session/init command (exact semantic name still unknown)
-```
+| Characteristic | Observed role |
+|---|---|
+| C1 | device/status information |
+| C2 | color temperature |
+| C3 | brightness |
+| C4 | local date, `YY MM DD` |
+| C5 | local time, `HH MM SS` |
+| C6 | power/zones plus physical authorization status |
+| CE | `AF 01` control-session preamble; **not** treated as pairing |
 
-Current decoded functionality:
+Decoded controls:
 
-- Brightness: 0–100 % mapped to 0–10000
-- Color temperature: Kelvin value transferred as a 16-bit value
-- Date/time synchronization: decoded from the capture
-- `AF 01` session/init write: observed and replayed, exact meaning still under investigation
-- Power / zones: experimental
-- Standard BLE SMP bonding: not observed in the available capture
+- Brightness: 0–100 % maps to 0–10000, duplicated big-endian 16-bit value.
+- Color temperature: Kelvin value, duplicated big-endian 16-bit value.
+- Power/zones: experimental.
 
-See [`docs/protocol.md`](docs/protocol.md) and [`docs/pairing.md`](docs/pairing.md).
+The capture shows `CE = AF 01` later, immediately before interactive brightness/color-temperature groups. For C2/C3 interaction, the app then writes C6=`01 00 03 00` before the actual value. Version 0.1.5 mirrors that preamble for brightness/CCT control.
+
+See [`docs/protocol.md`](docs/protocol.md).
+
+## Experimental direct ESPHome control
+
+[`esphome/direct_control_experimental.yaml`](esphome/direct_control_experimental.yaml) is kept as an alternative. The Home Assistant integration is recommended because it can use Home Assistant's Bluetooth routing and ESPHome Bluetooth proxies.
 
 ## Privacy
 
-This public repository intentionally contains no:
+This public repository intentionally contains no personal names, home-network IP addresses, Wi-Fi credentials, Home Assistant API keys, OTA passwords, real Bluetooth MAC addresses, or raw PacketLogger `.pklg` captures.
 
-- personal names or identifiers
-- home network IP addresses
-- Wi-Fi credentials
-- Home Assistant API keys
-- OTA passwords
-- real Bluetooth MAC addresses
-- raw PacketLogger `.pklg` captures
-
-Raw Bluetooth captures may expose device addresses and nearby Bluetooth metadata. Do not publish them without redaction.
+Raw Bluetooth captures may expose device addresses and nearby Bluetooth metadata. Redact them before publishing.
 
 ## GitHub Pages
 
-An optional documentation landing page is included in [`docs/index.md`](docs/index.md).
-
-To enable GitHub Pages:
-
-1. Open the repository on GitHub.
-2. Go to **Settings → Pages**.
-3. Under **Build and deployment**, choose **Deploy from a branch**.
-4. Branch: **main**.
-5. Folder: **/docs**.
-6. Click **Save**.
+An optional documentation landing page is included in [`docs/index.md`](docs/index.md). To enable it, use **Settings → Pages → Deploy from a branch → main → /docs**.
 
 ## Issues / contributions
 
 Bug reports and protocol findings are welcome:
 
 https://github.com/aharder3/schneider-ambient-ble/issues
-
-Before submitting a Bluetooth capture, remove or redact personal device addresses and nearby-device metadata.
 
 ## Disclaimer
 

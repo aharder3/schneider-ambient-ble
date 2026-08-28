@@ -2,33 +2,38 @@
   "config": {
     "flow_title": "{name}",
     "progress": {
-      "scanning": "Searching for a connectable Schneider/WSC device",
-      "connecting": "Connecting to the mirror cabinet before the pairing/learn step",
-      "initializing": "Applying the observed Schneider session initialization after the physical button confirmation"
+      "scanning": "Searching for a connectable Schneider/WSC mirror cabinet",
+      "connecting": "Connecting to the Schneider/WSC cabinet over Bluetooth/GATT",
+      "waiting_for_button": "Bluetooth/GATT is connected. Press the physical pairing/learn button on the light or mirror cabinet NOW. Home Assistant is polling the cabinet every 0.5 seconds and will continue automatically when the cabinet confirms the button press.",
+      "syncing": "Physical button confirmation received from the cabinet. Reading the current cabinet state and synchronizing date/time exactly as observed in the Schneider app capture."
     },
     "step": {
+      "bluetooth_confirm": {
+        "title": "Set up Schneider Ambient BLE",
+        "description": "Set up **{name}**? Home Assistant will first establish a Bluetooth/GATT connection. Only after the connection succeeds will Home Assistant tell you to press the physical pairing/learn button."
+      },
       "select_device": {
         "title": "Select Schneider/WSC device",
-        "description": "More than one compatible device was discovered. Select the mirror cabinet you want to add. Home Assistant will connect to it before asking you to press the physical pairing/learn button.",
+        "description": "More than one compatible device was discovered. Select the mirror cabinet you want to add.",
         "data": {
           "address": "Device"
         }
       },
-      "pairing_confirm": {
-        "title": "Connection established — press the pairing/learn button",
-        "description": "Home Assistant has successfully established a Bluetooth/GATT connection to **{name}**. **Now press the physical pairing/learn button on the light or mirror cabinet.** After pressing the button, choose **Continue**. Home Assistant will then send the application-level initialization observed in the Schneider app capture.\n\nThe captured session shows no standard BLE SMP pairing exchange, so the integration does not call Bluetooth `pair()`. The button is treated as a device-side authorization/learn step that occurs only after the connection has been established."
-      },
       "no_devices": {
         "title": "No Schneider/WSC device found",
-        "description": "Home Assistant could not discover a compatible Schneider/WSC device before the pairing step. Make sure the cabinet is powered and a connectable Bluetooth adapter or ESPHome Bluetooth Proxy is online and nearby, then choose **Retry**. Do not press the cabinet's pairing/learn button yet; Home Assistant will ask for it only after a Bluetooth connection succeeds."
+        "description": "Home Assistant could not discover a connectable Schneider/WSC device. Make sure the cabinet is powered and the ESPHome Bluetooth Proxy or Bluetooth adapter is online and nearby, then choose **Retry**. Do not press the pairing/learn button yet."
       },
       "connect_failed": {
         "title": "Could not connect to the mirror cabinet",
-        "description": "Home Assistant discovered the Schneider/WSC device but could not establish the Bluetooth/GATT connection. Check that the ESPHome Bluetooth Proxy is online and close to the cabinet, then choose **Retry**. Do not press the pairing/learn button yet — the button prompt is shown only after the connection succeeds."
+        "description": "The WSC device was discovered, but Home Assistant could not establish the Bluetooth/GATT connection. Check the Bluetooth proxy and range, then choose **Retry**. The physical pairing/learn button is only used after the GATT connection succeeds.\\n\\nTechnical detail: `{error}`"
       },
-      "initialize_failed": {
-        "title": "Authorization/initialization did not complete",
-        "description": "Home Assistant connected successfully and you confirmed the physical button press, but the observed Schneider initialization could not be completed. Choose **Retry** to establish a fresh Bluetooth connection; Home Assistant will then ask you to press the pairing/learn button again. No configuration entry was saved."
+      "button_timeout": {
+        "title": "Physical button was not confirmed",
+        "description": "Home Assistant connected successfully but did not receive the cabinet's authorization marker from characteristic C6 within 60 seconds. Choose **Retry**. After the new Bluetooth connection succeeds, press the physical pairing/learn button when Home Assistant asks for it.\\n\\nTechnical detail: `{error}`"
+      },
+      "sync_failed": {
+        "title": "Post-pairing synchronization failed",
+        "description": "The cabinet confirmed the physical button press, but Home Assistant could not complete the state reads and date/time synchronization seen in the official app. Choose **Retry** to repeat the full connection and authorization sequence.\\n\\nTechnical detail: `{error}`"
       }
     },
     "abort": {

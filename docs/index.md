@@ -1,26 +1,15 @@
 # Schneider Ambient BLE
 
-Experimental local Home Assistant integration for Schneider Ambient Lighting / WSC mirrors and mirror cabinets over Bluetooth Low Energy.
+Experimental Home Assistant integration for Schneider Ambient Lighting / WSC mirror cabinets over BLE.
 
-[![Open your Home Assistant instance and open HACS repository](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=aharder3&repository=schneider-ambient-ble&category=integration)
+Current integration version: **0.1.5**.
 
-## Quick start
+## Recommended setup
 
-1. Flash an ESP32 with the included ESPHome Bluetooth Proxy example.
-2. Add this repository to HACS as a custom **Integration**.
-3. Install **Schneider Ambient BLE** and restart Home Assistant.
-4. Open **Settings → Devices & services** and look for Bluetooth discovery.
+Use an ESP32 running ESPHome as a connectable Bluetooth Proxy and install the Home Assistant custom integration through HACS.
 
-Repository: https://github.com/aharder3/schneider-ambient-ble
+## First authorization
 
-## Project status
+The captured app flow is **connect first, physical button second**. After the GATT connection is established, the app polls C6 roughly every 0.5 seconds. Before the physical button press, C6 reports `01 00 03 00 00 00 00 00`; after the press it reports `01 55 03 00 00 00 00 00`. Home Assistant version 0.1.5 mirrors this behavior and advances automatically on the `0x55` marker.
 
-Brightness and color temperature have been decoded. Power/zone behavior and pairing/bonding are experimental.
-
-## Privacy
-
-Do not publish raw PacketLogger captures, credentials, network addresses or real Bluetooth MAC addresses.
-
-## Disclaimer
-
-Independent community project. Not affiliated with or endorsed by Schneider or W. Schneider+Co AG.
+See [Pairing / first authorization](pairing.md) and [Protocol notes](protocol.md).

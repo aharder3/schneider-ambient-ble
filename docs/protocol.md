@@ -84,3 +84,24 @@ Observed writes include:
 - `03 00 03 00`
 
 `00 00 00 00` appears to be an all-off state. The remaining bitfield semantics still need a controlled capture before they should be treated as stable.
+## First-authorization state machine
+
+The capture establishes the following sequence with high confidence:
+
+1. Connect to WSC.
+2. Exchange MTU and discover GATT services/characteristics.
+3. Read C1.
+4. Poll C6 every ~0.5 s.
+5. While waiting: C6 = `01 00 03 00 00 00 00 00`.
+6. Physical button pressed.
+7. Next C6 read = `01 55 03 00 00 00 00 00`.
+8. Read current state: C1, C4, C5, CB, C2, C3, C6, C8, C6, C9, CA, D0, D1.
+9. Write current date to C4.
+10. Write current time to C5.
+11. The app is now in its normal control session.
+
+This is the flow implemented in integration version 0.1.5.
+
+### Control-group preamble
+
+`CE = AF 01` is first observed later, immediately before interactive brightness/color-temperature control groups. For brightness and CCT, the capture then writes C6=`01 00 03 00` before sending the C3/C2 value. Therefore `AF 01` is treated as a control-session preamble rather than as a pairing command.

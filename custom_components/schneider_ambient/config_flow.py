@@ -12,16 +12,12 @@ from homeassistant.components.bluetooth import BluetoothServiceInfoBleak
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
 from homeassistant.const import CONF_ADDRESS
 
-from .ble import SchneiderBleClient
+from .ble import SchneiderAuthorizationTimeout, SchneiderBleClient
 from .const import DOMAIN, SERVICE_UUID
 
 _LOGGER = logging.getLogger(__name__)
 
-# Manual setup first discovers the already-advertising WSC device, then opens a
-# real GATT connection. Only after that connection succeeds does the flow ask the
-# user to press the cabinet's physical pairing/learn button.
-DISCOVERY_SCAN_SECONDS = 8.0
-SETUP_CONNECTION_HOLD_SECONDS = 90.0
+DISCOVERY_SCAN_SECONDS = 10.0
 
 
 def _device_name(discovery_info: BluetoothServiceInfoBleak) -> str:
@@ -46,15 +42,16 @@ class SchneiderAmbientConfigFlow(ConfigFlow, domain=DOMAIN):
         self._discovered_devices: dict[str, BluetoothServiceInfoBleak] = {}
         self._scan_task: asyncio.Task[None] | None = None
         self._connect_task: asyncio.Task[BleakClientWithServiceCache] | None = None
-        self._initialize_task: asyncio.Task[None] | None = None
+        self._authorization_task: asyncio.Task[bytes] | None = None
+        self._sync_task: asyncio.Task[None] | None = None
         self._setup_client: BleakClientWithServiceCache | None = None
-        self._disconnect_watchdog: asyncio.Task[None] | None = None
+        self._last_error = "No additional error information"
 
     @override
     async def async_step_bluetooth(
         self, discovery_info: BluetoothServiceInfoBleak
     ) -> ConfigFlowResult:
-        """Handle automatic Bluetooth discovery and connect before prompting."""
+        """Handle automatic Bluetooth discovery without connecting unsolicited."""
         if not _is_supported(discovery_info):
             return self.async_abort(reason="not_supported")
 
@@ -62,14 +59,31 @@ class SchneiderAmbientConfigFlow(ConfigFlow, domain=DOMAIN):
         await self.async_set_unique_id(discovery_info.address)
         self._abort_if_unique_id_configured()
         self.context["title_placeholders"] = {"name": _device_name(discovery_info)}
-        self._connect_task = None
-        return await self.async_step_connect()
+        return await self.async_step_bluetooth_confirm()
+
+    async def async_step_bluetooth_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Ask whether the automatically discovered cabinet should be configured."""
+        assert self._discovery_info is not None
+
+        if user_input is not None:
+            self._connect_task = None
+            return await self.async_step_connect()
+
+        self._set_confirm_only()
+        return self.async_show_form(
+            step_id="bluetooth_confirm",
+            description_placeholders={
+                "name": self.context["title_placeholders"]["name"]
+            },
+        )
 
     @override
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Start manual setup by discovering the cabinet before any button press."""
+        """Start manual setup by discovering the already-advertising WSC device."""
         self._discovered_devices = {}
         self._scan_task = None
         return await self.async_step_scan()
@@ -80,14 +94,12 @@ class SchneiderAmbientConfigFlow(ConfigFlow, domain=DOMAIN):
             self.hass, duration=DISCOVERY_SCAN_SECONDS
         )
 
-        current_ids = self._async_current_ids(include_ignore=False)
         found: dict[str, BluetoothServiceInfoBleak] = {}
-
         for discovery_info in bluetooth.async_discovered_service_info(
             self.hass, connectable=True
         ):
             address = discovery_info.address
-            if address in current_ids or address in found:
+            if address in found:
                 continue
             if _is_supported(discovery_info):
                 found[address] = discovery_info
@@ -97,7 +109,7 @@ class SchneiderAmbientConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_scan(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Discover a WSC device before asking for the physical button press."""
+        """Discover WSC before opening the pairing/authorization connection."""
         if self._scan_task is None:
             self._scan_task = self.hass.async_create_task(
                 self._async_scan_for_devices(),
@@ -122,7 +134,7 @@ class SchneiderAmbientConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_select_device(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Select a device from the pre-pairing discovery scan."""
+        """Select one discovered WSC device."""
         if not self._discovered_devices:
             return await self.async_step_no_devices()
 
@@ -143,7 +155,7 @@ class SchneiderAmbientConfigFlow(ConfigFlow, domain=DOMAIN):
         )
 
     async def _async_use_selected_address(self, address: str) -> ConfigFlowResult:
-        """Store one discovered device and connect to it before prompting the user."""
+        """Select an address and then open the GATT connection."""
         discovery_info = self._discovered_devices.get(address)
         if discovery_info is None:
             discovery_info = bluetooth.async_last_service_info(
@@ -161,14 +173,8 @@ class SchneiderAmbientConfigFlow(ConfigFlow, domain=DOMAIN):
         self._connect_task = None
         return await self.async_step_connect()
 
-    async def _async_open_setup_connection(self) -> BleakClientWithServiceCache:
-        """Open the GATT connection that precedes the physical-button prompt."""
-        assert self._discovery_info is not None
-        client = SchneiderBleClient(self.hass, self._discovery_info.address)
-        return await client.open_connection()
-
     async def _async_close_setup_client(self) -> None:
-        """Close any setup connection without masking the original flow result."""
+        """Close the setup connection without masking the flow result."""
         client = self._setup_client
         self._setup_client = None
         if client is None:
@@ -179,40 +185,23 @@ class SchneiderAmbientConfigFlow(ConfigFlow, domain=DOMAIN):
         except Exception:  # noqa: BLE001
             _LOGGER.debug("Error while closing Schneider setup connection", exc_info=True)
 
-    async def _async_disconnect_after_timeout(self) -> None:
-        """Avoid leaking a GATT connection if the confirmation dialog is abandoned."""
-        try:
-            await asyncio.sleep(SETUP_CONNECTION_HOLD_SECONDS)
-            await self._async_close_setup_client()
-        except asyncio.CancelledError:
-            raise
-
-    def _start_disconnect_watchdog(self) -> None:
-        """Start a bounded hold window for the setup connection."""
-        if self._disconnect_watchdog is not None:
-            self._disconnect_watchdog.cancel()
-        self._disconnect_watchdog = self.hass.async_create_task(
-            self._async_disconnect_after_timeout(),
-            "Schneider Ambient setup connection timeout",
-        )
-
-    def _cancel_disconnect_watchdog(self) -> None:
-        """Cancel the setup-connection hold timer."""
-        if self._disconnect_watchdog is not None:
-            self._disconnect_watchdog.cancel()
-            self._disconnect_watchdog = None
+    async def _async_open_setup_connection(self) -> BleakClientWithServiceCache:
+        """Connect exactly before the physical-button polling stage."""
+        assert self._discovery_info is not None
+        helper = SchneiderBleClient(self.hass, self._discovery_info.address)
+        return await helper.open_connection()
 
     async def async_step_connect(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Establish GATT first; only then show the physical-button confirmation."""
+        """Establish GATT before waiting for the physical cabinet button."""
         assert self._discovery_info is not None
 
         if self._connect_task is None:
             await self._async_close_setup_client()
             self._connect_task = self.hass.async_create_task(
                 self._async_open_setup_connection(),
-                "Schneider Ambient pre-pairing connection",
+                "Schneider Ambient authorization connection",
             )
 
         if not self._connect_task.done():
@@ -224,87 +213,98 @@ class SchneiderAmbientConfigFlow(ConfigFlow, domain=DOMAIN):
 
         try:
             self._setup_client = self._connect_task.result()
-        except Exception:  # noqa: BLE001
+        except Exception as err:  # noqa: BLE001
+            self._last_error = f"{type(err).__name__}: {err}"
             _LOGGER.exception("Could not establish Schneider/WSC GATT connection")
             self._setup_client = None
             return self.async_show_progress_done(next_step_id="connect_failed")
 
-        self._start_disconnect_watchdog()
-        return self.async_show_progress_done(next_step_id="pairing_confirm")
+        self._authorization_task = None
+        return self.async_show_progress_done(next_step_id="wait_for_button")
 
-    async def async_step_pairing_confirm(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
-        """Prompt only after Home Assistant has successfully connected to WSC."""
-        assert self._discovery_info is not None
-
-        if user_input is not None:
-            self._cancel_disconnect_watchdog()
-            self._initialize_task = None
-            return await self.async_step_initialize()
-
-        self._set_confirm_only()
-        return self.async_show_form(
-            step_id="pairing_confirm",
-            description_placeholders={
-                "name": self.context["title_placeholders"]["name"]
-            },
-        )
-
-    async def _async_initialize_after_button(self) -> None:
-        """After confirmation, initialize over the established/recovered connection."""
-        assert self._discovery_info is not None
-
+    async def _async_wait_for_button(self) -> bytes:
+        """Poll C6 on the existing connection until the cabinet confirms the button."""
         client = self._setup_client
         if client is None or not client.is_connected:
-            # If the cabinet or proxy dropped the link while the user was pressing
-            # the button, reconnect automatically before replaying the observed app
-            # initialization. The important setup order remains: a successful GATT
-            # connection was established before the button prompt was shown.
-            await self._async_close_setup_client()
-            helper = SchneiderBleClient(self.hass, self._discovery_info.address)
-            client = await helper.open_connection()
-            self._setup_client = client
+            raise RuntimeError("Schneider setup connection was lost before authorization")
+        return await SchneiderBleClient.wait_for_physical_authorization(client)
 
-        helper = SchneiderBleClient(self.hass, self._discovery_info.address)
-        try:
-            await helper.initialize_connected_client(client)
-        finally:
-            await self._async_close_setup_client()
-
-    async def async_step_initialize(
+    async def async_step_wait_for_button(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Apply the observed Schneider initialization after the button press."""
-        if self._initialize_task is None:
-            self._initialize_task = self.hass.async_create_task(
-                self._async_initialize_after_button(),
-                "Schneider Ambient post-button initialization",
+        """Show the physical-button instruction while C6 is polled every 0.5 s."""
+        if self._authorization_task is None:
+            self._authorization_task = self.hass.async_create_task(
+                self._async_wait_for_button(),
+                "Schneider Ambient wait for physical authorization",
             )
 
-        if not self._initialize_task.done():
+        if not self._authorization_task.done():
             return self.async_show_progress(
-                step_id="initialize",
-                progress_action="initializing",
-                progress_task=self._initialize_task,
+                step_id="wait_for_button",
+                progress_action="waiting_for_button",
+                progress_task=self._authorization_task,
             )
 
         try:
-            self._initialize_task.result()
-        except Exception:  # noqa: BLE001
-            _LOGGER.exception(
-                "Schneider/WSC initialization failed after physical-button confirmation"
+            value = self._authorization_task.result()
+            _LOGGER.debug(
+                "Schneider physical authorization confirmed by C6: %s",
+                value.hex(" "),
             )
-            return self.async_show_progress_done(next_step_id="initialize_failed")
+        except SchneiderAuthorizationTimeout as err:
+            self._last_error = str(err)
+            _LOGGER.warning("Timed out waiting for Schneider physical button: %s", err)
+            await self._async_close_setup_client()
+            return self.async_show_progress_done(next_step_id="button_timeout")
+        except Exception as err:  # noqa: BLE001
+            self._last_error = f"{type(err).__name__}: {err}"
+            _LOGGER.exception("Schneider authorization polling failed")
+            await self._async_close_setup_client()
+            return self.async_show_progress_done(next_step_id="connect_failed")
+
+        self._sync_task = None
+        return self.async_show_progress_done(next_step_id="sync")
+
+    async def _async_sync_authorized_cabinet(self) -> None:
+        """Read current state and sync date/time on the still-open authorized link."""
+        client = self._setup_client
+        if client is None or not client.is_connected:
+            raise RuntimeError("Schneider setup connection was lost after authorization")
+        await SchneiderBleClient.sync_after_authorization(client)
+
+    async def async_step_sync(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Mirror the official app's post-button reads and clock sync."""
+        if self._sync_task is None:
+            self._sync_task = self.hass.async_create_task(
+                self._async_sync_authorized_cabinet(),
+                "Schneider Ambient post-authorization sync",
+            )
+
+        if not self._sync_task.done():
+            return self.async_show_progress(
+                step_id="sync",
+                progress_action="syncing",
+                progress_task=self._sync_task,
+            )
+
+        try:
+            self._sync_task.result()
+        except Exception as err:  # noqa: BLE001
+            self._last_error = f"{type(err).__name__}: {err}"
+            _LOGGER.exception("Schneider post-authorization state/clock sync failed")
+            await self._async_close_setup_client()
+            return self.async_show_progress_done(next_step_id="sync_failed")
 
         return self.async_show_progress_done(next_step_id="finish")
 
     async def async_step_finish(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Create the entry only after connect -> button -> initialization succeeds."""
+        """Create the entry only after the captured authorization sequence succeeds."""
         assert self._discovery_info is not None
-        self._cancel_disconnect_watchdog()
         await self._async_close_setup_client()
         return self.async_create_entry(
             title=_device_name(self._discovery_info),
@@ -314,7 +314,7 @@ class SchneiderAmbientConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_no_devices(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Let the user retry discovery before any pairing-button instruction."""
+        """Let the user retry discovery."""
         if user_input is not None:
             self._scan_task = None
             self._discovered_devices = {}
@@ -326,23 +326,48 @@ class SchneiderAmbientConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_connect_failed(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Retry the pre-pairing GATT connection without asking for the button yet."""
+        """Retry GATT connection without asking for the physical button first."""
         if user_input is not None:
             self._connect_task = None
-            return await self.async_step_connect()
-
-        self._set_confirm_only()
-        return self.async_show_form(step_id="connect_failed")
-
-    async def async_step_initialize_failed(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
-        """Retry from a fresh connection and repeat the button step."""
-        if user_input is not None:
-            self._initialize_task = None
-            self._connect_task = None
+            self._authorization_task = None
             await self._async_close_setup_client()
             return await self.async_step_connect()
 
         self._set_confirm_only()
-        return self.async_show_form(step_id="initialize_failed")
+        return self.async_show_form(
+            step_id="connect_failed",
+            description_placeholders={"error": self._last_error},
+        )
+
+    async def async_step_button_timeout(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Retry the exact connect -> C6-poll sequence after a button timeout."""
+        if user_input is not None:
+            self._connect_task = None
+            self._authorization_task = None
+            await self._async_close_setup_client()
+            return await self.async_step_connect()
+
+        self._set_confirm_only()
+        return self.async_show_form(
+            step_id="button_timeout",
+            description_placeholders={"error": self._last_error},
+        )
+
+    async def async_step_sync_failed(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Retry the whole authorization path if post-button sync fails."""
+        if user_input is not None:
+            self._connect_task = None
+            self._authorization_task = None
+            self._sync_task = None
+            await self._async_close_setup_client()
+            return await self.async_step_connect()
+
+        self._set_confirm_only()
+        return self.async_show_form(
+            step_id="sync_failed",
+            description_placeholders={"error": self._last_error},
+        )

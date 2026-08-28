@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.5
+
+- Rebuilt the first-authorization flow from the PacketLogger capture.
+- The integration now connects first, then polls characteristic C6 every 0.5 s while instructing the user to press the physical pairing/learn button.
+- The setup continues automatically only when C6 changes from the observed pre-button state `01 00 03 00 00 00 00 00` to the observed confirmation state `01 55 03 00 00 00 00 00`.
+- Removed the incorrect user-side Continue confirmation from the pairing step.
+- Replays the official app's post-button state-read order and date/time synchronization.
+- `AF 01` is no longer treated as a pairing command; the capture shows it later as part of interactive control groups.
+- Manual discovery no longer hides an already-configured address as "not found"; Home Assistant can report `already_configured` correctly.
+
 ## 0.1.4
 
 - Corrected the pairing/learn sequence: Home Assistant now discovers and **connects to WSC first**.
