@@ -9,14 +9,14 @@
         }
       },
       "bluetooth_confirm": {
-        "title": "Schneider Ambient BLE einrichten",
-        "description": "{name} einrichten. Falls der Spiegelschrank eine Kopplung verlangt, versetze ihn vor dem Bestätigen in den Pairing-Modus. Pairing/Bonding wird noch validiert."
+        "title": "Schneider-Ambient-Gerät koppeln",
+        "description": "Drücke jetzt die physische Pairing-Taste an der Leuchte bzw. am Spiegelschrank. Lasse das Gerät im Pairing-Modus und tippe danach auf Senden, um fortzufahren. Die PacketLogger-Auswertung zeigt im aufgezeichneten App-Ablauf kein standardmässiges BLE-SMP-Bonding; dieser Schritt bildet deshalb die erforderliche Tastenbetätigung nach, ohne fälschlich ein Bluetooth-Bonding zu behaupten."
       }
     },
     "abort": {
       "already_configured": "Dieses Gerät ist bereits eingerichtet.",
-      "device_not_found": "Das ausgewählte Gerät ist nicht mehr sichtbar. Versetze den Spiegelschrank in den Pairing-Modus und versuche es erneut.",
-      "no_devices_found": "Kein kompatibles Schneider/WSC-Gerät gefunden. Prüfe, ob ein verbindungsfähiger Bluetooth-Adapter oder ESPHome Bluetooth Proxy online ist, versetze den Spiegelschrank in den Pairing-Modus und versuche es erneut.",
+      "device_not_found": "Das ausgewählte Gerät ist nicht mehr sichtbar. Drücke die physische Pairing-Taste an der Leuchte bzw. am Spiegelschrank und versuche es erneut.",
+      "no_devices_found": "Kein kompatibles Schneider/WSC-Gerät gefunden. Prüfe, ob ein verbindungsfähiger Bluetooth-Adapter oder ESPHome Bluetooth Proxy online ist, drücke die physische Pairing-Taste an der Leuchte bzw. am Spiegelschrank und versuche es erneut.",
       "not_supported": "Das gefundene Bluetooth-Gerät wird von dieser Integration nicht unterstützt."
     }
   }

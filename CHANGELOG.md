@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.2
+
+- Add explicit physical pairing-button instruction to the Home Assistant config flow.
+- Document PacketLogger evidence: no standard BLE SMP/bonding exchange is present in the captured WSC session.
+- Identify the pre-command C4/C5 writes as date/time synchronisation rather than pairing credentials.
+- Add `docs/pairing.md` with a reproducible capture procedure for true first-time registration.
+
+
 ## 0.1.1
 
 - Fix Home Assistant manual setup returning `not_implemented` by implementing `async_step_user`.

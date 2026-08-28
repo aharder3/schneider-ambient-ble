@@ -9,14 +9,14 @@
         }
       },
       "bluetooth_confirm": {
-        "title": "Set up Schneider Ambient BLE",
-        "description": "Set up {name}. If the cabinet requires pairing, put it into pairing mode before confirming. Pairing/bonding is still being validated."
+        "title": "Pair Schneider Ambient device",
+        "description": "Press the physical pairing button on the light/mirror cabinet now. Keep the device in pairing mode, then select Submit to continue. PacketLogger analysis did not show standard BLE SMP bonding in the captured app session, so this step reproduces the required physical-button procedure without claiming a Bluetooth bond was created."
       }
     },
     "abort": {
       "already_configured": "This device is already configured.",
-      "device_not_found": "The selected device is no longer visible. Put the cabinet into pairing mode and try again.",
-      "no_devices_found": "No compatible Schneider/WSC device was found. Make sure a connectable Bluetooth adapter or ESPHome Bluetooth Proxy is online, then put the cabinet into pairing mode and try again.",
+      "device_not_found": "The selected device is no longer visible. Press the physical pairing button on the light/mirror cabinet and try again.",
+      "no_devices_found": "No compatible Schneider/WSC device was found. Make sure a connectable Bluetooth adapter or ESPHome Bluetooth Proxy is online, press the physical pairing button on the light/mirror cabinet, then try again.",
       "not_supported": "The discovered Bluetooth device is not supported by this integration."
     }
   }

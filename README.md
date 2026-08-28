@@ -135,3 +135,7 @@ Use at your own risk. The integration is based on reverse engineering of locally
 ## License
 
 See [`LICENSE`](LICENSE).
+
+## Pairing behavior
+
+The setup flow asks you to press the physical pairing button on the light/mirror cabinet before continuing. The current PacketLogger capture does not contain standard BLE SMP bonding, so the integration does not falsely claim that a BLE bond has been created. See [`docs/pairing.md`](docs/pairing.md) for the evidence and capture procedure.
