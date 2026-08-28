@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.7
+
+- Fixed the blank Home Assistant completion message (`Created configuration for .`) by giving manual config flows a stable title from the first step.
+- Register the Schneider/WSC device in the Home Assistant device registry immediately during config-entry setup, before entity platforms are forwarded.
+- Fixed the experimental switch platform importing the removed `CHAR_POWER` constant; C6 is now consistently referenced as `CHAR_CONTROL`.
+- Physical authorization now requires a fresh C6 transition: at least one non-`0x55` read must be observed before `0x55` is accepted. A stale `0x55` on initial connection no longer skips the button step.
+- Normal brightness/color-temperature writes no longer require C6 to remain `0x55`; the capture indicates `0x55` is part of first authorization, not a permanent per-write authorization flag.
+
 ## 0.1.6
 
 - Confirmed the captured connect → C6 polling → `0x55` physical-authorization → state/clock-sync flow works end-to-end in Home Assistant through an ESPHome Bluetooth Proxy.

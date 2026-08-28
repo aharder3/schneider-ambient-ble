@@ -7,7 +7,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .ble import SchneiderBleClient
-from .const import CHAR_POWER
+from .const import CHAR_CONTROL
 
 POWER_ON_EXPERIMENTAL = bytes([0x01, 0x00, 0x03, 0x00])
 POWER_OFF = bytes([0x00, 0x00, 0x00, 0x00])
@@ -39,11 +39,11 @@ class SchneiderPowerSwitch(SwitchEntity):
         }
 
     async def async_turn_on(self, **kwargs) -> None:
-        await self._client.write(CHAR_POWER, POWER_ON_EXPERIMENTAL)
+        await self._client.write(CHAR_CONTROL, POWER_ON_EXPERIMENTAL)
         self._attr_is_on = True
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs) -> None:
-        await self._client.write(CHAR_POWER, POWER_OFF)
+        await self._client.write(CHAR_CONTROL, POWER_OFF)
         self._attr_is_on = False
         self.async_write_ha_state()

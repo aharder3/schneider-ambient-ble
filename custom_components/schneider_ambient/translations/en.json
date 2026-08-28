@@ -1,6 +1,6 @@
 {
   "config": {
-    "flow_title": "{name}",
+    "flow_title": "Schneider Ambient BLE",
     "progress": {
       "scanning": "Searching for a connectable Schneider/WSC mirror cabinet",
       "connecting": "Connecting to the Schneider/WSC cabinet over Bluetooth/GATT",
@@ -29,7 +29,7 @@
       },
       "button_timeout": {
         "title": "Physical button was not confirmed",
-        "description": "Home Assistant connected successfully but did not receive the cabinet's authorization marker from characteristic C6 within 60 seconds. Choose **Retry**. After the new Bluetooth connection succeeds, press the physical pairing/learn button when Home Assistant asks for it.\\n\\nTechnical detail: `{error}`"
+        "description": "Home Assistant connected successfully but did not observe a fresh C6 transition from a non-authorized value to `0x55` within 60 seconds. A stale `0x55` already present when the connection opens is deliberately not accepted as a new button press. Choose **Retry** and press the physical pairing/learn button only when Home Assistant asks for it.\\n\\nTechnical detail: `{error}`"
       },
       "sync_failed": {
         "title": "Post-pairing synchronization failed",

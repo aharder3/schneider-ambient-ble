@@ -120,39 +120,47 @@ class SchneiderBleClient:
         *,
         timeout: float = BUTTON_WAIT_TIMEOUT_SECONDS,
     ) -> bytes:
-        """Mirror the official app's connect-then-poll physical-button flow.
+        """Wait for a *fresh* physical-button transition on C6.
 
-        PacketLogger shows the app doing the following after GATT discovery:
-        1. Read C1 once.
-        2. Poll C6 approximately every 0.5 seconds.
-        3. Before the physical button is pressed C6 is
-           01 00 03 00 00 00 00 00.
-        4. The first poll after the button press is
-           01 55 03 00 00 00 00 00.
-        5. Only then does the app continue with the rest of setup.
+        The captured first-authorization session shows C6 repeatedly returning
+        ``01 00 03 00 00 00 00 00`` before the cabinet button is pressed. The
+        first read after the button press returns
+        ``01 55 03 00 00 00 00 00``.
 
-        This is application-level authorization. The captured session contains no
-        BLE SMP Pairing Request/Response and no link-encryption transition.
+        A stale ``0x55`` already present on the first read is therefore not
+        accepted as a new button press. We must first observe a non-authorized
+        value and only then accept a transition to ``0x55``.
         """
-        # The official app reads C1 before starting the C6 polling loop.
         device_info = bytes(await client.read_gatt_char(CHAR_DEVICE_INFO))
         _LOGGER.debug("Schneider C1 before authorization: %s", device_info.hex(" "))
 
-        # The capture shows ~0.5 s between the C1 response and the first C6 poll.
         await asyncio.sleep(BUTTON_POLL_INTERVAL_SECONDS)
 
         loop = asyncio.get_running_loop()
         deadline = loop.time() + timeout
         last_value: bytes | None = None
+        saw_non_authorized = False
 
         while True:
             value = bytes(await client.read_gatt_char(CHAR_CONTROL))
             if value != last_value:
-                _LOGGER.debug("Schneider C6 authorization state: %s", value.hex(" "))
+                _LOGGER.debug(
+                    "Schneider C6 authorization state: %s", value.hex(" ")
+                )
                 last_value = value
 
             if cls._is_authorized(value):
-                return value
+                if saw_non_authorized:
+                    _LOGGER.debug(
+                        "Schneider fresh physical authorization transition confirmed"
+                    )
+                    return value
+                _LOGGER.debug(
+                    "Schneider C6 already contains 0x55; waiting for a fresh "
+                    "non-authorized -> 0x55 transition"
+                )
+            else:
+                saw_non_authorized = True
 
             remaining = deadline - loop.time()
             if remaining <= 0:
@@ -207,7 +215,9 @@ class SchneiderBleClient:
         """Connect and perform one control write using the observed app preamble."""
         client = await self.open_connection()
         try:
-            await self.verify_authorized(client)
+            # The 0x55 marker belongs to the first authorization flow. The
+            # official app does not require a fresh 0x55 marker before every
+            # later brightness/CCT write, so normal control must not gate on it.
 
             # In the capture, brightness and color-temperature interaction groups
             # begin with CE=AF 01 and C6=01 00 03 00 before the actual C2/C3 writes.

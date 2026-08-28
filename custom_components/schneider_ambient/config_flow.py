@@ -14,7 +14,7 @@ from homeassistant.const import CONF_ADDRESS
 
 from .ble import SchneiderAuthorizationTimeout, SchneiderBleClient
 from .const import DOMAIN, SERVICE_UUID
-from .helpers import normalize_device_name
+from .helpers import DEFAULT_DEVICE_NAME, normalize_device_name
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -85,6 +85,10 @@ class SchneiderAmbientConfigFlow(ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Start manual setup by discovering the already-advertising WSC device."""
+        # A manual flow starts before a Bluetooth device name is known. Give the
+        # flow a stable title immediately so Home Assistant's final create-entry
+        # screen never renders "Created configuration for .".
+        self.context["title_placeholders"] = {"name": DEFAULT_DEVICE_NAME}
         self._discovered_devices = {}
         self._scan_task = None
         return await self.async_step_scan()
@@ -306,9 +310,11 @@ class SchneiderAmbientConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> ConfigFlowResult:
         """Create the entry only after the captured authorization sequence succeeds."""
         assert self._discovery_info is not None
+        title = _device_name(self._discovery_info)
+        self.context["title_placeholders"] = {"name": title}
         await self._async_close_setup_client()
         return self.async_create_entry(
-            title=_device_name(self._discovery_info),
+            title=title,
             data={CONF_ADDRESS: self._discovery_info.address},
         )
 

@@ -1,6 +1,6 @@
 {
   "config": {
-    "flow_title": "{name}",
+    "flow_title": "Schneider Ambient BLE",
     "progress": {
       "scanning": "Suche nach einem verbindbaren Schneider/WSC-Spiegelschrank",
       "connecting": "Bluetooth-/GATT-Verbindung zum Schneider/WSC-Spiegelschrank wird hergestellt",
@@ -29,7 +29,7 @@
       },
       "button_timeout": {
         "title": "Tastendruck wurde nicht bestätigt",
-        "description": "Home Assistant war erfolgreich verbunden, hat aber innerhalb von 60 Sekunden auf Characteristic C6 nicht die Bestätigung des Spiegelschranks erhalten. Wähle **Erneut versuchen** und drücke die physische Pairing-/Anlerntaste erst nach dem erneuten erfolgreichen Verbindungsaufbau, wenn Home Assistant dazu auffordert.\\n\\nTechnisches Detail: `{error}`"
+        "description": "Home Assistant war erfolgreich verbunden, hat aber innerhalb von 60 Sekunden keine frische C6-Zustandsänderung von nicht autorisiert auf `0x55` erkannt. Die Integration akzeptiert einen bereits beim Verbindungsaufbau vorhandenen `0x55`-Wert bewusst nicht als neuen Tastendruck. Wähle **Erneut versuchen** und drücke die physische Pairing-/Anlerntaste erst, wenn Home Assistant dazu auffordert.\\n\\nTechnisches Detail: `{error}`"
       },
       "sync_failed": {
         "title": "Synchronisierung nach dem Pairing fehlgeschlagen",

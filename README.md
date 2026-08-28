@@ -4,7 +4,7 @@ Experimental local Home Assistant control for Schneider Ambient Lighting / WSC m
 
 > **Status:** reverse-engineering project. Brightness and color temperature are decoded. Power/zone semantics are still experimental.
 >
-> **Current integration version: 0.1.6.** The captured first-authorization flow is now confirmed working end-to-end through Home Assistant and an ESPHome Bluetooth Proxy. This release also fixes invalid/blank Bluetooth device names that could make Home Assistant show `Created configuration for .`.
+> **Current integration version: 0.1.7.** This release fixes the remaining Home Assistant setup-result issue, registers the WSC device immediately, fixes the experimental switch platform import, and requires a fresh C6 non-authorized → `0x55` transition for physical authorization.
 
 [![Open your Home Assistant instance and open HACS repository](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=aharder3&repository=schneider-ambient-ble&category=integration)
 
@@ -47,7 +47,7 @@ When updating an existing development install, use **Redownload** in HACS and ve
 contains:
 
 ```json
-"version": "0.1.6"
+"version": "0.1.7"
 ```
 
 ## ESPHome Bluetooth Proxy
@@ -66,6 +66,11 @@ bluetooth_proxy:
 ```
 
 Keep Wi-Fi credentials, API keys and OTA passwords in your local `secrets.yaml`; never commit them.
+
+
+### Home Assistant setup-result behavior
+
+Version 0.1.7 fixes two separate causes of the blank `Created configuration for .` screen: the manual config flow now has a stable title from its first step, and the integration creates the Home Assistant device-registry entry before forwarding entity platforms. It also fixes the experimental switch platform importing the obsolete `CHAR_POWER` symbol.
 
 ## First authorization / pairing flow
 
