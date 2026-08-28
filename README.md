@@ -4,7 +4,7 @@ Experimental local Home Assistant control for Schneider Ambient Lighting / WSC m
 
 > **Status:** experimental reverse-engineering project. Brightness and color temperature are decoded. Power/zone semantics and pairing/bonding are still being validated.
 >
-> **Current integration version: 0.1.1.** This release adds the manual Home Assistant setup flow; older 0.1.0 builds can show `not_implemented` when the integration is added manually.
+> **Current integration version: 0.1.2.** This release adds the physical pairing-button prompt and documents the observed Schneider/WSC pairing behavior. Version 0.1.1 added the manual Home Assistant setup flow; older 0.1.0 builds can show `not_implemented` when the integration is added manually.
 
 [![Open your Home Assistant instance and open HACS repository](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=aharder3&repository=schneider-ambient-ble&category=integration)
 
@@ -43,11 +43,11 @@ Use the button above. It opens your Home Assistant instance and prepares this re
 11. Go to **Settings → Devices & services**.
 12. When the mirror cabinet is visible through a connectable Bluetooth adapter or ESPHome Bluetooth Proxy, Home Assistant should offer discovery automatically.
 
-You can also add the integration manually via **Settings → Devices & services → Add integration → Schneider Ambient BLE**. Version 0.1.1 scans Home Assistant's existing Bluetooth cache/proxies and lets you select the discovered `WSC` device.
+You can also add the integration manually via **Settings → Devices & services → Add integration → Schneider Ambient BLE**. Version 0.1.2 scans Home Assistant's existing Bluetooth cache/proxies, lets you select the discovered `WSC` device, and explicitly asks you to press the physical pairing button on the light/mirror cabinet before continuing.
 
-If Home Assistant shows `not_implemented`, an old 0.1.0 copy is still loaded. Update the HACS integration, restart Home Assistant completely, and verify that `manifest.json` reports version `0.1.1`.
+If Home Assistant shows `not_implemented`, an old 0.1.0 copy is still loaded. Update/redownload the HACS integration, restart Home Assistant completely, and verify that `manifest.json` reports version `0.1.2`.
 
-If pairing mode is required by the cabinet, place the cabinet in pairing mode when Home Assistant asks for it. Pairing/bonding support is still experimental in this project.
+During setup, Home Assistant now explicitly asks you to press the physical pairing button on the light/mirror cabinet before continuing. The captured protocol does not show standard BLE SMP bonding, so this project currently treats the button press as a required device-side pairing/authorization step rather than claiming a standard BLE bond was created.
 
 ## ESPHome Bluetooth Proxy
 
