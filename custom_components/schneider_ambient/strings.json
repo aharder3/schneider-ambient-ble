@@ -1,22 +1,37 @@
 {
   "config": {
+    "flow_title": "{name}",
+    "progress": {
+      "scanning": "Scanning for Schneider/WSC devices after the physical button press",
+      "connecting": "Connecting to the mirror cabinet and replaying the observed Schneider session initialization"
+    },
     "step": {
-      "user": {
-        "title": "Select Schneider Ambient device",
-        "description": "Select a Schneider/WSC mirror or mirror cabinet currently visible to Home Assistant Bluetooth.",
+      "prepare_pairing": {
+        "title": "Put the mirror cabinet into pairing mode",
+        "description": "Before Home Assistant scans, press the physical pairing/learn button on the light or mirror cabinet now. Keep the device powered and close to the Bluetooth proxy, then press **Continue**. Home Assistant will immediately run a fresh active Bluetooth scan.\n\nPacketLogger shows no standard BLE SMP pairing in the captured Schneider app session, so Home Assistant does not call Bluetooth `pair()`. The physical button is treated as a device-side discovery/authorization step."
+      },
+      "select_device": {
+        "title": "Select Schneider/WSC device",
+        "description": "More than one compatible device was found during the fresh scan. Select the mirror cabinet you want to add.",
         "data": {
           "address": "Device"
         }
       },
       "bluetooth_confirm": {
-        "title": "Pair Schneider Ambient device",
-        "description": "Press the physical pairing button on the light/mirror cabinet now. Keep the device in pairing mode, then select Submit to continue. PacketLogger analysis did not show standard BLE SMP bonding in the captured app session, so this step reproduces the required physical-button procedure without claiming a Bluetooth bond was created."
+        "title": "Set up {name}",
+        "description": "Home Assistant automatically discovered **{name}**. If you have not already done so, press the physical pairing/learn button on the light or mirror cabinet, then press **Continue**. Home Assistant will verify the GATT connection before saving the device."
+      },
+      "no_devices": {
+        "title": "No Schneider/WSC device found",
+        "description": "The fresh Bluetooth scan did not see a compatible Schneider/WSC device. Check that a connectable Bluetooth adapter or ESPHome Bluetooth Proxy is online and close to the mirror cabinet. Press the physical pairing/learn button on the cabinet, then choose **Retry** to start a new scan."
+      },
+      "connect_failed": {
+        "title": "Could not initialize the mirror cabinet",
+        "description": "Home Assistant found the device but could not complete the connection and the observed Schneider initialization sequence. Press the physical pairing/learn button again, make sure the ESPHome Bluetooth Proxy is online and nearby, then choose **Retry**. No configuration entry was saved."
       }
     },
     "abort": {
       "already_configured": "This device is already configured.",
-      "device_not_found": "The selected device is no longer visible. Press the physical pairing button on the light/mirror cabinet and try again.",
-      "no_devices_found": "No compatible Schneider/WSC device was found. Make sure a connectable Bluetooth adapter or ESPHome Bluetooth Proxy is online, press the physical pairing button on the light/mirror cabinet, then try again.",
       "not_supported": "The discovered Bluetooth device is not supported by this integration."
     }
   }

@@ -1,22 +1,37 @@
 {
   "config": {
+    "flow_title": "{name}",
+    "progress": {
+      "scanning": "Schneider/WSC-Geräte werden nach dem Tastendruck gesucht",
+      "connecting": "Verbindung zum Spiegelschrank wird geprüft und die beobachtete Schneider-Sitzungsinitialisierung wird ausgeführt"
+    },
     "step": {
-      "user": {
-        "title": "Schneider-Ambient-Gerät auswählen",
-        "description": "Wähle einen Schneider/WSC-Spiegel oder Spiegelschrank aus, der aktuell über Home Assistant Bluetooth erreichbar ist.",
+      "prepare_pairing": {
+        "title": "Spiegelschrank in den Anlernmodus versetzen",
+        "description": "Drücke **jetzt zuerst die physische Pairing-/Anlerntaste an der Leuchte bzw. am Spiegelschrank**. Lasse das Gerät eingeschaltet und in der Nähe des Bluetooth-Proxys und tippe danach auf **Weiter**. Home Assistant startet unmittelbar danach einen frischen aktiven Bluetooth-Scan.\n\nDer PacketLogger-Mitschnitt zeigt beim aufgezeichneten Schneider-App-Ablauf kein standardmässiges BLE-SMP-Pairing. Home Assistant ruft deshalb nicht künstlich Bluetooth `pair()` auf. Der Tastendruck wird als geräteseitiger Anlern-/Freigabeschritt behandelt."
+      },
+      "select_device": {
+        "title": "Schneider/WSC-Gerät auswählen",
+        "description": "Beim frischen Scan wurden mehrere kompatible Geräte gefunden. Wähle den gewünschten Spiegel bzw. Spiegelschrank aus.",
         "data": {
           "address": "Gerät"
         }
       },
       "bluetooth_confirm": {
-        "title": "Schneider-Ambient-Gerät koppeln",
-        "description": "Drücke jetzt die physische Pairing-Taste an der Leuchte bzw. am Spiegelschrank. Lasse das Gerät im Pairing-Modus und tippe danach auf Senden, um fortzufahren. Die PacketLogger-Auswertung zeigt im aufgezeichneten App-Ablauf kein standardmässiges BLE-SMP-Bonding; dieser Schritt bildet deshalb die erforderliche Tastenbetätigung nach, ohne fälschlich ein Bluetooth-Bonding zu behaupten."
+        "title": "{name} einrichten",
+        "description": "Home Assistant hat **{name}** automatisch entdeckt. Falls noch nicht geschehen, drücke jetzt die physische Pairing-/Anlerntaste an der Leuchte bzw. am Spiegelschrank und tippe danach auf **Weiter**. Vor dem Speichern prüft Home Assistant die GATT-Verbindung und führt die im Schneider-App-Mitschnitt beobachtete Initialisierung aus."
+      },
+      "no_devices": {
+        "title": "Kein Schneider/WSC-Gerät gefunden",
+        "description": "Der frische Bluetooth-Scan hat kein kompatibles Schneider/WSC-Gerät gesehen. Prüfe, ob ein verbindungsfähiger Bluetooth-Adapter oder ESPHome Bluetooth Proxy online und nahe beim Spiegelschrank ist. Drücke die physische Pairing-/Anlerntaste am Spiegelschrank und wähle danach **Erneut versuchen**, um einen neuen Scan zu starten."
+      },
+      "connect_failed": {
+        "title": "Spiegelschrank konnte nicht initialisiert werden",
+        "description": "Home Assistant hat das Gerät gefunden, konnte aber die Verbindung bzw. die beobachtete Schneider-Initialisierung nicht erfolgreich abschliessen. Drücke die physische Pairing-/Anlerntaste erneut, prüfe den ESPHome Bluetooth Proxy und wähle danach **Erneut versuchen**. Es wurde kein Gerät gespeichert."
       }
     },
     "abort": {
       "already_configured": "Dieses Gerät ist bereits eingerichtet.",
-      "device_not_found": "Das ausgewählte Gerät ist nicht mehr sichtbar. Drücke die physische Pairing-Taste an der Leuchte bzw. am Spiegelschrank und versuche es erneut.",
-      "no_devices_found": "Kein kompatibles Schneider/WSC-Gerät gefunden. Prüfe, ob ein verbindungsfähiger Bluetooth-Adapter oder ESPHome Bluetooth Proxy online ist, drücke die physische Pairing-Taste an der Leuchte bzw. am Spiegelschrank und versuche es erneut.",
       "not_supported": "Das gefundene Bluetooth-Gerät wird von dieser Integration nicht unterstützt."
     }
   }
