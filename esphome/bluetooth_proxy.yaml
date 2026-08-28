@@ -1,0 +1,45 @@
+substitutions:
+  name: esp-bathroom-bluetooth
+  friendly_name: Bathroom Bluetooth Proxy
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+logger:
+
+api:
+  encryption:
+    key: !secret api_key
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Optional: uncomment and adapt if you use a static address.
+  # manual_ip:
+  #   static_ip: 192.168.X.Y
+  #   gateway: 192.168.X.1
+  #   subnet: 255.255.255.0
+
+  ap:
+    ssid: "${friendly_name} Fallback"
+    password: !secret fallback_ap_password
+
+captive_portal:
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+esp32_ble_tracker:
+  scan_parameters:
+    active: true
+
+bluetooth_proxy:
+  active: true

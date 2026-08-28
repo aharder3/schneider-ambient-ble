@@ -1,0 +1,17 @@
+# Private captures / local analysis
+*.pklg
+captures/
+analysis/
+
+# ESPHome/local secrets
+secrets.yaml
+*.secrets.yaml
+.esphome/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# macOS
+.DS_Store

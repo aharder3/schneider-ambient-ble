@@ -1,0 +1,17 @@
+{
+  "domain": "schneider_ambient",
+  "name": "Schneider Ambient BLE",
+  "bluetooth": [
+    {
+      "service_uuid": "b35d95c0-6a68-437e-abe7-0ebffd8e0661",
+      "connectable": true
+    }
+  ],
+  "codeowners": [],
+  "config_flow": true,
+  "documentation": "https://github.com/OWNER/schneider-ambient-ble",
+  "integration_type": "device",
+  "iot_class": "local_push",
+  "requirements": [],
+  "version": "0.1.0"
+}

@@ -1,0 +1,104 @@
+substitutions:
+  name: schneider-ambient-direct
+  friendly_name: Schneider Ambient Direct
+  # Replace with the current BLE address found in ESPHome logs.
+  schneider_mac: "AA:BB:CC:DD:EE:FF"
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+logger:
+api:
+ota:
+  - platform: esphome
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+esp32_ble_tracker:
+  scan_parameters:
+    active: true
+
+# The ESP can still act as a Home Assistant Bluetooth proxy.
+bluetooth_proxy:
+  active: true
+
+ble_client:
+  - mac_address: ${schneider_mac}
+    id: schneider_ble
+    auto_connect: true
+    on_connect:
+      then:
+        - logger.log: "Connected to Schneider Ambient Lighting"
+    on_disconnect:
+      then:
+        - logger.log: "Disconnected from Schneider Ambient Lighting"
+
+number:
+  - platform: template
+    id: schneider_brightness
+    name: "Schneider Brightness"
+    icon: mdi:brightness-6
+    min_value: 0
+    max_value: 100
+    step: 1
+    unit_of_measurement: "%"
+    optimistic: true
+    restore_value: true
+    set_action:
+      - ble_client.ble_write:
+          id: schneider_ble
+          service_uuid: B35D95C0-6A68-437E-ABE7-0EBFFD8E0661
+          characteristic_uuid: B35D95C3-6A68-437E-ABE7-0EBFFD8E0661
+          value: !lambda |-
+            uint16_t raw = (uint16_t) lroundf(x * 100.0f);
+            uint8_t hi = (raw >> 8) & 0xFF;
+            uint8_t lo = raw & 0xFF;
+            return {hi, lo, hi, lo};
+
+  - platform: template
+    id: schneider_cct
+    name: "Schneider Color Temperature"
+    icon: mdi:temperature-kelvin
+    min_value: 2000
+    max_value: 6500
+    step: 100
+    unit_of_measurement: "K"
+    optimistic: true
+    restore_value: true
+    set_action:
+      - ble_client.ble_write:
+          id: schneider_ble
+          service_uuid: B35D95C0-6A68-437E-ABE7-0EBFFD8E0661
+          characteristic_uuid: B35D95C2-6A68-437E-ABE7-0EBFFD8E0661
+          value: !lambda |-
+            uint16_t kelvin = (uint16_t) lroundf(x);
+            uint8_t hi = (kelvin >> 8) & 0xFF;
+            uint8_t lo = kelvin & 0xFF;
+            return {hi, lo, hi, lo};
+
+# Experimental: power/zone semantics are not fully decoded yet.
+switch:
+  - platform: template
+    id: schneider_power_experimental
+    name: "Schneider Power (Experimental)"
+    optimistic: true
+    turn_on_action:
+      - ble_client.ble_write:
+          id: schneider_ble
+          service_uuid: B35D95C0-6A68-437E-ABE7-0EBFFD8E0661
+          characteristic_uuid: B35D95C6-6A68-437E-ABE7-0EBFFD8E0661
+          value: [0x01, 0x00, 0x03, 0x00]
+    turn_off_action:
+      - ble_client.ble_write:
+          id: schneider_ble
+          service_uuid: B35D95C0-6A68-437E-ABE7-0EBFFD8E0661
+          characteristic_uuid: B35D95C6-6A68-437E-ABE7-0EBFFD8E0661
+          value: [0x00, 0x00, 0x00, 0x00]

@@ -1,0 +1,13 @@
+{
+  "config": {
+    "step": {
+      "bluetooth_confirm": {
+        "title": "Set up Schneider Ambient BLE",
+        "description": "Set up {name}. If the cabinet requires pairing, put it into pairing mode before confirming. Pairing-button handling is still experimental."
+      }
+    },
+    "abort": {
+      "already_configured": "This device is already configured."
+    }
+  }
+}
