@@ -1,13 +1,23 @@
 {
   "config": {
     "step": {
+      "user": {
+        "title": "Select Schneider Ambient device",
+        "description": "Select a Schneider/WSC mirror or mirror cabinet currently visible to Home Assistant Bluetooth.",
+        "data": {
+          "address": "Device"
+        }
+      },
       "bluetooth_confirm": {
         "title": "Set up Schneider Ambient BLE",
-        "description": "Set up {name}. If the cabinet requires pairing, put it into pairing mode before confirming. Pairing-button handling is still experimental."
+        "description": "Set up {name}. If the cabinet requires pairing, put it into pairing mode before confirming. Pairing/bonding is still being validated."
       }
     },
     "abort": {
-      "already_configured": "This device is already configured."
+      "already_configured": "This device is already configured.",
+      "device_not_found": "The selected device is no longer visible. Put the cabinet into pairing mode and try again.",
+      "no_devices_found": "No compatible Schneider/WSC device was found. Make sure a connectable Bluetooth adapter or ESPHome Bluetooth Proxy is online, then put the cabinet into pairing mode and try again.",
+      "not_supported": "The discovered Bluetooth device is not supported by this integration."
     }
   }
 }

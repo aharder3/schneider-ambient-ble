@@ -5,13 +5,19 @@
     {
       "service_uuid": "b35d95c0-6a68-437e-abe7-0ebffd8e0661",
       "connectable": true
+    },
+    {
+      "local_name": "WSC*",
+      "connectable": true
     }
   ],
   "codeowners": [],
   "config_flow": true,
-  "documentation": "https://github.com/OWNER/schneider-ambient-ble",
+  "dependencies": ["bluetooth_adapters"],
+  "documentation": "https://github.com/aharder3/schneider-ambient-ble",
+  "issue_tracker": "https://github.com/aharder3/schneider-ambient-ble/issues",
   "integration_type": "device",
-  "iot_class": "local_push",
+  "iot_class": "local_polling",
   "requirements": [],
-  "version": "0.1.0"
+  "version": "0.1.1"
 }

@@ -1,0 +1,27 @@
+name: Protocol finding
+description: Share a redacted BLE protocol observation
+title: "[Protocol]: "
+labels: ["protocol"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Redact Bluetooth MAC addresses, personal identifiers, credentials and unrelated nearby-device metadata before posting.
+  - type: input
+    id: action
+    attributes:
+      label: User action tested
+      placeholder: e.g. brightness 20% → 50%
+    validations:
+      required: true
+  - type: textarea
+    id: observation
+    attributes:
+      label: Observed GATT / ATT data
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Additional notes

@@ -1,12 +1,59 @@
 # Schneider Ambient BLE
 
-Experimental local control for Schneider Ambient Lighting / WSC mirrors and mirror cabinets.
+Experimental local Home Assistant control for Schneider Ambient Lighting / WSC mirrors and mirror cabinets over Bluetooth Low Energy.
 
-The repository intentionally contains **no personal identifiers, network addresses, Bluetooth MAC addresses, raw PacketLogger captures, or credentials**.
+> **Status:** experimental reverse-engineering project. Brightness and color temperature are decoded. Power/zone semantics and pairing/bonding are still being validated.
+>
+> **Current integration version: 0.1.1.** This release adds the manual Home Assistant setup flow; older 0.1.0 builds can show `not_implemented` when the integration is added manually.
 
-## Recommended setup: ESPHome Bluetooth Proxy + Home Assistant integration
+[![Open your Home Assistant instance and open HACS repository](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=aharder3&repository=schneider-ambient-ble&category=integration)
 
-Flash an ESP32 with [`esphome/bluetooth_proxy.yaml`](esphome/bluetooth_proxy.yaml). The ESP acts only as a connectable Bluetooth proxy; Schneider-specific logic stays in Home Assistant.
+## Recommended architecture
+
+```text
+Schneider / WSC mirror cabinet
+          ⇅ BLE
+ESP32 with ESPHome Bluetooth Proxy
+          ⇅ LAN / Wi-Fi
+Home Assistant
+          ⇅
+Schneider Ambient BLE custom integration
+```
+
+The ESP32 remains a generic connectable Bluetooth Proxy. Schneider-specific protocol handling stays in Home Assistant.
+
+## Install with HACS
+
+### One-click
+
+Use the button above. It opens your Home Assistant instance and prepares this repository for HACS.
+
+### Manual HACS installation
+
+1. Open **HACS** in Home Assistant.
+2. Open **Integrations**.
+3. Open the menu in the top-right corner.
+4. Choose **Custom repositories**.
+5. Repository: `https://github.com/aharder3/schneider-ambient-ble`
+6. Type/category: **Integration**.
+7. Click **Add**.
+8. Search for **Schneider Ambient BLE**.
+9. Install it.
+10. Restart Home Assistant.
+11. Go to **Settings → Devices & services**.
+12. When the mirror cabinet is visible through a connectable Bluetooth adapter or ESPHome Bluetooth Proxy, Home Assistant should offer discovery automatically.
+
+You can also add the integration manually via **Settings → Devices & services → Add integration → Schneider Ambient BLE**. Version 0.1.1 scans Home Assistant's existing Bluetooth cache/proxies and lets you select the discovered `WSC` device.
+
+If Home Assistant shows `not_implemented`, an old 0.1.0 copy is still loaded. Update the HACS integration, restart Home Assistant completely, and verify that `manifest.json` reports version `0.1.1`.
+
+If pairing mode is required by the cabinet, place the cabinet in pairing mode when Home Assistant asks for it. Pairing/bonding support is still experimental in this project.
+
+## ESPHome Bluetooth Proxy
+
+Recommended example: [`esphome/bluetooth_proxy.yaml`](esphome/bluetooth_proxy.yaml)
+
+Core configuration:
 
 ```yaml
 esp32_ble_tracker:
@@ -17,63 +64,74 @@ bluetooth_proxy:
   active: true
 ```
 
-The custom integration matches the proprietary Schneider service UUID and should appear as a Bluetooth-discovered device in Home Assistant when the cabinet is reachable through a connectable Bluetooth adapter/proxy.
+Keep Wi-Fi credentials, API keys and OTA passwords in your local `secrets.yaml` and never commit that file.
 
-### HACS installation
+## Experimental direct ESPHome control
 
-Until this repository is added to the HACS default store, add it as a **Custom repository** of type **Integration**. Then install **Schneider Ambient BLE** and restart Home Assistant.
+[`esphome/direct_control_experimental.yaml`](esphome/direct_control_experimental.yaml) contains an alternative where the ESP32 connects to the cabinet itself while still acting as a Bluetooth Proxy.
 
-Current entities:
+This option requires a local BLE address and is intentionally not preconfigured with a real device address.
 
-- brightness number (decoded)
-- color-temperature number (decoded)
-- experimental power switch, disabled by default
+## Current protocol knowledge
 
-Pairing/bonding behavior and power/zone semantics still need controlled captures before they can be considered stable.
+The proprietary service observed during reverse engineering is:
 
-## Alternative: direct ESPHome control
-
-[`esphome/direct_control_experimental.yaml`](esphome/direct_control_experimental.yaml) lets an ESP32 connect directly to the cabinet and expose controls to Home Assistant while still acting as a Bluetooth proxy.
-
-This requires setting the current BLE address in `schneider_mac`. Some devices may use a random/private address, so the address should not be published or assumed permanent.
-
-## ESPHome secrets
-
-Example local `secrets.yaml` (never commit it):
-
-```yaml
-wifi_ssid: "YOUR_WIFI"
-wifi_password: "YOUR_PASSWORD"
-api_key: "YOUR_ESPHOME_API_KEY"
-ota_password: "YOUR_OTA_PASSWORD"
-fallback_ap_password: "YOUR_FALLBACK_AP_PASSWORD"
+```text
+B35D95C0-6A68-437E-ABE7-0EBFFD8E0661
 ```
 
-## Protocol notes
+Current decoded functionality:
 
-See [`docs/protocol.md`](docs/protocol.md).
+- Brightness: 0–100 % mapped to 0–10000
+- Color temperature: Kelvin value transferred as a 16-bit value
+- Power / zones: experimental
+- Pairing / bonding: under investigation
 
-## Privacy / publishing
+See [`docs/protocol.md`](docs/protocol.md) for technical notes.
 
-Do **not** commit raw `.pklg` files. They can contain device addresses and nearby Bluetooth metadata. The `.gitignore` blocks them by default.
+## Privacy
 
-## Publishing to GitHub
+This public repository intentionally contains no:
 
-With the GitHub CLI installed and authenticated:
+- personal names or identifiers
+- home network IP addresses
+- Wi-Fi credentials
+- Home Assistant API keys
+- OTA passwords
+- real Bluetooth MAC addresses
+- raw PacketLogger `.pklg` captures
 
-```bash
-git clone /path/to/this/folder schneider-ambient-ble
-cd schneider-ambient-ble
+Raw Bluetooth captures may expose device addresses and nearby Bluetooth metadata. Do not publish them.
 
-gh auth status
-gh repo create schneider-ambient-ble --public --source=. --remote=origin --push
-```
+## GitHub Pages
 
-Or create an empty repository in the GitHub web UI and then:
+An optional documentation landing page is included in [`docs/index.md`](docs/index.md).
 
-```bash
-git remote add origin git@github.com:YOUR_GITHUB_USER/schneider-ambient-ble.git
-git push -u origin main
-```
+To enable GitHub Pages:
 
-After creating the repository, replace `OWNER` in `custom_components/schneider_ambient/manifest.json` with the GitHub owner/user name.
+1. Open the repository on GitHub.
+2. Go to **Settings → Pages**.
+3. Under **Build and deployment**, choose **Deploy from a branch**.
+4. Branch: **main**.
+5. Folder: **/docs**.
+6. Click **Save**.
+
+GitHub will then publish the documentation page after the Pages deployment completes.
+
+## Issues / contributions
+
+Bug reports and protocol findings are welcome via GitHub Issues:
+
+https://github.com/aharder3/schneider-ambient-ble/issues
+
+Before submitting a Bluetooth capture, remove or redact personal device addresses and nearby-device metadata.
+
+## Disclaimer
+
+This is an independent community project and is not affiliated with, endorsed by, or supported by Schneider or W. Schneider+Co AG. Product and company names may be trademarks of their respective owners.
+
+Use at your own risk. The integration is based on reverse engineering of locally observed Bluetooth communication and may stop working after firmware or app updates.
+
+## License
+
+See [`LICENSE`](LICENSE).

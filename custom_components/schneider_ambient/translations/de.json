@@ -1,0 +1,23 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Schneider-Ambient-Gerät auswählen",
+        "description": "Wähle einen Schneider/WSC-Spiegel oder Spiegelschrank aus, der aktuell über Home Assistant Bluetooth erreichbar ist.",
+        "data": {
+          "address": "Gerät"
+        }
+      },
+      "bluetooth_confirm": {
+        "title": "Schneider Ambient BLE einrichten",
+        "description": "{name} einrichten. Falls der Spiegelschrank eine Kopplung verlangt, versetze ihn vor dem Bestätigen in den Pairing-Modus. Pairing/Bonding wird noch validiert."
+      }
+    },
+    "abort": {
+      "already_configured": "Dieses Gerät ist bereits eingerichtet.",
+      "device_not_found": "Das ausgewählte Gerät ist nicht mehr sichtbar. Versetze den Spiegelschrank in den Pairing-Modus und versuche es erneut.",
+      "no_devices_found": "Kein kompatibles Schneider/WSC-Gerät gefunden. Prüfe, ob ein verbindungsfähiger Bluetooth-Adapter oder ESPHome Bluetooth Proxy online ist, versetze den Spiegelschrank in den Pairing-Modus und versuche es erneut.",
+      "not_supported": "Das gefundene Bluetooth-Gerät wird von dieser Integration nicht unterstützt."
+    }
+  }
+}

@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation
+    url: https://github.com/aharder3/schneider-ambient-ble
+    about: Read installation and protocol documentation first.

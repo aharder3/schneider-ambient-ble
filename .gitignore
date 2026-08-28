@@ -1,17 +1,20 @@
-# Private captures / local analysis
-*.pklg
-captures/
-analysis/
-
-# ESPHome/local secrets
+# ESPHome / secrets
 secrets.yaml
 *.secrets.yaml
 .esphome/
 
+# Bluetooth captures / diagnostics
+*.pklg
+*.pcap
+*.pcapng
+captures/
+logs/
+
+# OS / editors
+.DS_Store
+.vscode/
+.idea/
+
 # Python
 __pycache__/
 *.pyc
-.venv/
-
-# macOS
-.DS_Store
