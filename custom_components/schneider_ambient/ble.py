@@ -33,10 +33,8 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 BUTTON_POLL_INTERVAL_SECONDS = 0.5
-BUTTON_WAIT_TIMEOUT_SECONDS = 60.0
+BUTTON_VERIFY_TIMEOUT_SECONDS = 8.0
 
-# Exact post-button read order observed in the Schneider app capture. These reads
-# populate the app with the cabinet's current state before date/time are synced.
 POST_AUTH_READ_ORDER = (
     CHAR_DEVICE_INFO,
     CHAR_DATE,
@@ -54,10 +52,6 @@ POST_AUTH_READ_ORDER = (
 )
 
 
-class SchneiderAuthorizationRequired(RuntimeError):
-    """Raised when the cabinet is connected but not physically authorized."""
-
-
 class SchneiderAuthorizationTimeout(TimeoutError):
     """Raised when C6 never reports the physical-button marker."""
 
@@ -68,6 +62,10 @@ class SchneiderAuthorizationTimeout(TimeoutError):
             "Timed out waiting for physical authorization; last C6 value: "
             f"{last_text}"
         )
+
+
+class SchneiderUnexpectedAuthorizationState(RuntimeError):
+    """Raised when C6 is already authorized before the user is prompted."""
 
 
 class SchneiderBleClient:
@@ -106,61 +104,49 @@ class SchneiderBleClient:
         )
 
     @staticmethod
-    def _is_authorized(control_value: bytes | bytearray) -> bool:
-        """Return True when C6 contains the button-confirmation marker."""
+    def is_authorized(control_value: bytes | bytearray) -> bool:
+        """Return True when C6 contains the physical authorization marker."""
         return (
             len(control_value) > AUTHORIZATION_BYTE_INDEX
             and control_value[AUTHORIZATION_BYTE_INDEX] == AUTHORIZATION_MARKER
         )
 
+    @staticmethod
+    async def read_pre_authorization_state(
+        client: BleakClientWithServiceCache,
+    ) -> tuple[bytes, bytes]:
+        """Read C1 and initial C6 before showing the physical-button form.
+
+        This exact order was independently confirmed against the real cabinet from
+        macOS: the GATT connection is already established, C1 is readable and C6
+        reports ``01 00 03 00 00 00 00 00`` before the physical button is pressed.
+        """
+        device_info = bytes(await client.read_gatt_char(CHAR_DEVICE_INFO))
+        control = bytes(await client.read_gatt_char(CHAR_CONTROL))
+        _LOGGER.debug("Schneider C1 before authorization: %s", device_info.hex(" "))
+        _LOGGER.debug("Schneider initial C6: %s", control.hex(" "))
+        return device_info, control
+
     @classmethod
-    async def wait_for_physical_authorization(
+    async def wait_for_authorization_marker(
         cls,
         client: BleakClientWithServiceCache,
         *,
-        timeout: float = BUTTON_WAIT_TIMEOUT_SECONDS,
+        timeout: float = BUTTON_VERIFY_TIMEOUT_SECONDS,
     ) -> bytes:
-        """Wait for a *fresh* physical-button transition on C6.
-
-        The captured first-authorization session shows C6 repeatedly returning
-        ``01 00 03 00 00 00 00 00`` before the cabinet button is pressed. The
-        first read after the button press returns
-        ``01 55 03 00 00 00 00 00``.
-
-        A stale ``0x55`` already present on the first read is therefore not
-        accepted as a new button press. We must first observe a non-authorized
-        value and only then accept a transition to ``0x55``.
-        """
-        device_info = bytes(await client.read_gatt_char(CHAR_DEVICE_INFO))
-        _LOGGER.debug("Schneider C1 before authorization: %s", device_info.hex(" "))
-
-        await asyncio.sleep(BUTTON_POLL_INTERVAL_SECONDS)
-
+        """Poll C6 after the user pressed the cabinet button and clicked Continue."""
         loop = asyncio.get_running_loop()
         deadline = loop.time() + timeout
         last_value: bytes | None = None
-        saw_non_authorized = False
 
         while True:
             value = bytes(await client.read_gatt_char(CHAR_CONTROL))
             if value != last_value:
-                _LOGGER.debug(
-                    "Schneider C6 authorization state: %s", value.hex(" ")
-                )
+                _LOGGER.debug("Schneider C6 after button press: %s", value.hex(" "))
                 last_value = value
 
-            if cls._is_authorized(value):
-                if saw_non_authorized:
-                    _LOGGER.debug(
-                        "Schneider fresh physical authorization transition confirmed"
-                    )
-                    return value
-                _LOGGER.debug(
-                    "Schneider C6 already contains 0x55; waiting for a fresh "
-                    "non-authorized -> 0x55 transition"
-                )
-            else:
-                saw_non_authorized = True
+            if cls.is_authorized(value):
+                return value
 
             remaining = deadline - loop.time()
             if remaining <= 0:
@@ -181,9 +167,6 @@ class SchneiderBleClient:
                 value.hex(" "),
             )
 
-        # The app then writes current YY/MM/DD and HH/MM/SS. No AF 01 write is
-        # observed during the authorization step itself; AF 01 appears later at
-        # the start of interactive control groups.
         now = dt_util.now()
         await client.write_gatt_char(
             CHAR_DATE,
@@ -198,35 +181,80 @@ class SchneiderBleClient:
             response=True,
         )
 
-    @classmethod
-    async def verify_authorized(
-        cls, client: BleakClientWithServiceCache
-    ) -> bytes:
-        """Verify that an already-configured cabinet still reports authorization."""
-        value = bytes(await client.read_gatt_char(CHAR_CONTROL))
-        if not cls._is_authorized(value):
-            raise SchneiderAuthorizationRequired(
-                "Schneider/WSC cabinet is connected but does not report the "
-                "physical authorization marker on C6"
-            )
-        return value
+    @staticmethod
+    def _uniform_u16_payload(current: bytes, value: int) -> bytes:
+        """Build the cabinet's repeated big-endian 16-bit zone payload.
 
-    async def write(self, characteristic: str, payload: bytes) -> None:
-        """Connect and perform one control write using the observed app preamble."""
+        C2 and C3 on the tested WSC are 8 bytes (four 16-bit slots). Reading the
+        characteristic first makes this robust to a different number of slots while
+        preserving the exact payload shape used by the device.
+        """
+        if len(current) < 2 or len(current) % 2:
+            raise RuntimeError(
+                f"Unexpected Schneider characteristic length: {len(current)} bytes"
+            )
+        encoded = max(0, min(65535, int(value))).to_bytes(2, "big")
+        return encoded * (len(current) // 2)
+
+    async def _write_uniform_u16(self, characteristic: str, value: int) -> bytes:
+        """Read length, send the confirmed preamble, write all zones, then verify."""
         client = await self.open_connection()
         try:
-            # The 0x55 marker belongs to the first authorization flow. The
-            # official app does not require a fresh 0x55 marker before every
-            # later brightness/CCT write, so normal control must not gate on it.
+            current = bytes(await client.read_gatt_char(characteristic))
+            payload = self._uniform_u16_payload(current, value)
 
-            # In the capture, brightness and color-temperature interaction groups
-            # begin with CE=AF 01 and C6=01 00 03 00 before the actual C2/C3 writes.
-            if characteristic in (CHAR_BRIGHTNESS, CHAR_CCT):
-                await client.write_gatt_char(CHAR_SESSION, SESSION_INIT, response=True)
-                await client.write_gatt_char(
-                    CHAR_CONTROL, CONTROL_ALL_ON, response=True
+            # Confirmed from the Schneider capture and the successful macOS CCT test.
+            await client.write_gatt_char(CHAR_SESSION, SESSION_INIT, response=True)
+            await client.write_gatt_char(CHAR_CONTROL, CONTROL_ALL_ON, response=True)
+            await client.write_gatt_char(characteristic, payload, response=True)
+
+            readback = bytes(await client.read_gatt_char(characteristic))
+            if readback != payload:
+                raise RuntimeError(
+                    "Schneider write completed but read-back differs: "
+                    f"wanted {payload.hex(' ')}, got {readback.hex(' ')}"
                 )
+            return readback
+        finally:
+            await client.disconnect()
 
+    async def set_color_temperature_kelvin(self, kelvin: int) -> bytes:
+        """Set all C2 light zones to one color temperature in Kelvin."""
+        if not 2000 <= kelvin <= 6500:
+            raise ValueError("Color temperature must be between 2000 and 6500 K")
+        return await self._write_uniform_u16(CHAR_CCT, kelvin)
+
+    async def set_brightness_percent(self, percent: float) -> bytes:
+        """Set all C3 light zones to one brightness percentage.
+
+        The capture encodes brightness as percent * 100 in each 16-bit slot. This
+        encoding is decoded from the trace but has not yet had the same independent
+        macOS write verification as C2/color temperature.
+        """
+        percent = max(0.0, min(100.0, float(percent)))
+        return await self._write_uniform_u16(CHAR_BRIGHTNESS, round(percent * 100))
+
+    async def read_control_state(self) -> tuple[float | None, int | None]:
+        """Read the first C3 brightness slot and first C2 CCT slot."""
+        client = await self.open_connection()
+        try:
+            c3 = bytes(await client.read_gatt_char(CHAR_BRIGHTNESS))
+            c2 = bytes(await client.read_gatt_char(CHAR_CCT))
+        finally:
+            await client.disconnect()
+
+        brightness = None
+        cct = None
+        if len(c3) >= 2:
+            brightness = int.from_bytes(c3[:2], "big") / 100.0
+        if len(c2) >= 2:
+            cct = int.from_bytes(c2[:2], "big")
+        return brightness, cct
+
+    async def write(self, characteristic: str, payload: bytes) -> None:
+        """Perform a raw write for experimental controls."""
+        client = await self.open_connection()
+        try:
             await client.write_gatt_char(characteristic, payload, response=True)
         finally:
             await client.disconnect()

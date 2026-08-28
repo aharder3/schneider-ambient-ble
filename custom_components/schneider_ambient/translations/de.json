@@ -5,41 +5,49 @@
     "progress": {
       "scanning": "Suche nach einem verbindbaren Schneider/WSC-Spiegelschrank",
       "connecting": "Bluetooth-/GATT-Verbindung zum Schneider/WSC-Spiegelschrank wird hergestellt",
-      "waiting_for_button": "Bluetooth/GATT ist verbunden. Drücke JETZT die physische Pairing-/Anlerntaste an der Leuchte bzw. am Spiegelschrank. Home Assistant fragt den Status alle 0,5 Sekunden ab und fährt automatisch fort, sobald der Spiegelschrank den Tastendruck bestätigt.",
-      "syncing": "Der Spiegelschrank hat den physischen Tastendruck bestätigt. Der aktuelle Gerätestatus wird gelesen und Datum/Uhrzeit werden wie im Mitschnitt der Schneider-App synchronisiert."
+      "verifying_button": "C6 wird auf die physische Freigabebest\u00e4tigung des Spiegelschranks (0x55) gepr\u00fcft",
+      "syncing": "Physische Freigabe best\u00e4tigt. Ger\u00e4testatus wird gelesen und Datum/Uhrzeit werden synchronisiert."
     },
     "step": {
       "bluetooth_confirm": {
         "title": "Schneider Ambient BLE einrichten",
-        "description": "**{name}** einrichten? Home Assistant stellt zuerst eine Bluetooth-/GATT-Verbindung her. Erst wenn diese erfolgreich ist, wirst du aufgefordert, die physische Pairing-/Anlerntaste zu drücken."
+        "description": "**{name}** einrichten? Home Assistant stellt zuerst die Bluetooth-/GATT-Verbindung her."
       },
       "select_device": {
-        "title": "Schneider/WSC-Gerät auswählen",
-        "description": "Mehrere kompatible Geräte wurden gefunden. Wähle den gewünschten Spiegelschrank aus.",
+        "title": "Schneider/WSC-Ger\u00e4t ausw\u00e4hlen",
+        "description": "Mehrere kompatible Ger\u00e4te wurden gefunden. W\u00e4hle den gew\u00fcnschten Spiegelschrank aus.",
         "data": {
-          "address": "Gerät"
+          "address": "Ger\u00e4t"
         }
       },
+      "press_button": {
+        "title": "Bluetooth verbunden \u2014 jetzt Taste am Spiegelschrank dr\u00fccken",
+        "description": "Home Assistant ist bereits mit dem Schneider/WSC-Spiegelschrank verbunden und hat best\u00e4tigt, dass C6 noch nicht autorisiert ist. **Dr\u00fccke jetzt die physische Pairing-/Anlerntaste an der Leuchte bzw. am Spiegelschrank.** Klicke erst danach auf **Weiter**. Home Assistant pr\u00fcft anschlie\u00dfend, ob C6 auf `0x55` gewechselt hat."
+      },
       "no_devices": {
-        "title": "Kein Schneider/WSC-Gerät gefunden",
-        "description": "Home Assistant konnte keinen verbindbaren Schneider/WSC-Spiegelschrank finden. Prüfe, ob der Spiegelschrank eingeschaltet und der ESPHome Bluetooth Proxy bzw. Bluetooth-Adapter online und in Reichweite ist. Wähle danach **Erneut versuchen**. Die Pairing-/Anlerntaste jetzt noch nicht drücken."
+        "title": "Kein Schneider/WSC-Ger\u00e4t gefunden",
+        "description": "Es wurde kein verbindbarer Schneider/WSC-Spiegelschrank gefunden. Pr\u00fcfe Stromversorgung, Reichweite und ESPHome Bluetooth Proxy und versuche es erneut."
       },
       "connect_failed": {
-        "title": "Verbindung zum Spiegelschrank fehlgeschlagen",
-        "description": "WSC wurde gefunden, aber die Bluetooth-/GATT-Verbindung konnte nicht aufgebaut werden. Prüfe Proxy und Reichweite und wähle **Erneut versuchen**. Die physische Pairing-/Anlerntaste wird erst nach erfolgreicher GATT-Verbindung benötigt.\\n\\nTechnisches Detail: `{error}`"
+        "title": "Schneider/WSC-Verbindung konnte nicht vorbereitet werden",
+        "description": "Home Assistant konnte die GATT-Verbindung nicht herstellen bzw. den initialen C6-Zustand nicht best\u00e4tigen. Versuche es erneut.\\n\\nTechnisches Detail: `{error}`"
       },
-      "button_timeout": {
-        "title": "Tastendruck wurde nicht bestätigt",
-        "description": "Home Assistant war erfolgreich verbunden, hat aber innerhalb von 60 Sekunden keine frische C6-Zustandsänderung von nicht autorisiert auf `0x55` erkannt. Die Integration akzeptiert einen bereits beim Verbindungsaufbau vorhandenen `0x55`-Wert bewusst nicht als neuen Tastendruck. Wähle **Erneut versuchen** und drücke die physische Pairing-/Anlerntaste erst, wenn Home Assistant dazu auffordert.\\n\\nTechnisches Detail: `{error}`"
+      "connection_lost": {
+        "title": "Bluetooth-Verbindung wurde getrennt",
+        "description": "Die Verbindung ging verloren, w\u00e4hrend die Aufforderung zum Tastendruck angezeigt wurde. Versuche es erneut; Home Assistant muss zuerst wieder verbunden sein, bevor du die Taste dr\u00fcckst.\\n\\nTechnisches Detail: `{error}`"
+      },
+      "button_not_confirmed": {
+        "title": "Tastendruck wurde nicht best\u00e4tigt",
+        "description": "Home Assistant blieb verbunden, aber C6 wechselte nach Weiter nicht auf `0x55`. Dr\u00fccke die physische Taste am Spiegelschrank erneut und versuche es nochmals.\\n\\nTechnisches Detail: `{error}`"
       },
       "sync_failed": {
-        "title": "Synchronisierung nach dem Pairing fehlgeschlagen",
-        "description": "Der Spiegelschrank hat den Tastendruck bestätigt, aber die im Original-App-Mitschnitt sichtbaren Statusabfragen bzw. die Datum-/Uhrzeit-Synchronisierung konnten nicht vollständig abgeschlossen werden. Wähle **Erneut versuchen**, um den gesamten Ablauf erneut auszuführen.\\n\\nTechnisches Detail: `{error}`"
+        "title": "Synchronisierung nach der Freigabe fehlgeschlagen",
+        "description": "C6 hat den physischen Tastendruck best\u00e4tigt, aber Statusabfragen oder Datum-/Uhrzeit-Synchronisierung schlugen fehl. Wiederhole die Einrichtung.\\n\\nTechnisches Detail: `{error}`"
       }
     },
     "abort": {
-      "already_configured": "Dieses Gerät ist bereits eingerichtet.",
-      "not_supported": "Das gefundene Bluetooth-Gerät wird von dieser Integration nicht unterstützt."
+      "already_configured": "Dieses Ger\u00e4t ist bereits eingerichtet.",
+      "not_supported": "Das gefundene Bluetooth-Ger\u00e4t wird von dieser Integration nicht unterst\u00fctzt."
     },
     "create_entry": {
       "success": "**{name}** wurde erfolgreich mit Schneider Ambient BLE eingerichtet."

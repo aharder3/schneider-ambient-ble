@@ -1,39 +1,48 @@
 {
+  "title": "Schneider Ambient BLE",
   "config": {
     "flow_title": "Schneider Ambient BLE",
     "progress": {
       "scanning": "Searching for a connectable Schneider/WSC mirror cabinet",
       "connecting": "Connecting to the Schneider/WSC cabinet over Bluetooth/GATT",
-      "waiting_for_button": "Bluetooth/GATT is connected. Press the physical pairing/learn button on the light or mirror cabinet NOW. Home Assistant is polling the cabinet every 0.5 seconds and will continue automatically when the cabinet confirms the button press.",
-      "syncing": "Physical button confirmation received from the cabinet. Reading the current cabinet state and synchronizing date/time exactly as observed in the Schneider app capture."
+      "verifying_button": "Checking C6 for the cabinet's physical authorization marker (0x55)",
+      "syncing": "Physical authorization confirmed. Reading the cabinet state and synchronizing date/time."
     },
     "step": {
       "bluetooth_confirm": {
         "title": "Set up Schneider Ambient BLE",
-        "description": "Set up **{name}**? Home Assistant will first establish a Bluetooth/GATT connection. Only after the connection succeeds will Home Assistant tell you to press the physical pairing/learn button."
+        "description": "Set up **{name}**? Home Assistant will first establish the Bluetooth/GATT connection."
       },
       "select_device": {
         "title": "Select Schneider/WSC device",
-        "description": "More than one compatible device was discovered. Select the mirror cabinet you want to add.",
+        "description": "More than one compatible device was discovered. Select the cabinet you want to add.",
         "data": {
           "address": "Device"
         }
       },
+      "press_button": {
+        "title": "Bluetooth connected \u2014 press the cabinet button now",
+        "description": "Home Assistant is already connected to the Schneider/WSC cabinet and has confirmed the initial C6 state is not authorized. **Now press the physical pairing/learn button on the light or mirror cabinet.** After pressing the physical button, click **Continue**. Home Assistant will then verify that C6 changed to `0x55`."
+      },
       "no_devices": {
         "title": "No Schneider/WSC device found",
-        "description": "Home Assistant could not discover a connectable Schneider/WSC device. Make sure the cabinet is powered and the ESPHome Bluetooth Proxy or Bluetooth adapter is online and nearby, then choose **Retry**. Do not press the pairing/learn button yet."
+        "description": "No connectable Schneider/WSC cabinet was found. Check power, range and the ESPHome Bluetooth Proxy, then retry."
       },
       "connect_failed": {
-        "title": "Could not connect to the mirror cabinet",
-        "description": "The WSC device was discovered, but Home Assistant could not establish the Bluetooth/GATT connection. Check the Bluetooth proxy and range, then choose **Retry**. The physical pairing/learn button is only used after the GATT connection succeeds.\\n\\nTechnical detail: `{error}`"
+        "title": "Could not prepare the Schneider/WSC connection",
+        "description": "Home Assistant could not establish the GATT connection and confirm the initial C6 state. Retry.\\n\\nTechnical detail: `{error}`"
       },
-      "button_timeout": {
+      "connection_lost": {
+        "title": "Bluetooth connection was lost",
+        "description": "The connection was lost while the physical-button screen was open. Retry; Home Assistant must connect again before you press the cabinet button.\\n\\nTechnical detail: `{error}`"
+      },
+      "button_not_confirmed": {
         "title": "Physical button was not confirmed",
-        "description": "Home Assistant connected successfully but did not observe a fresh C6 transition from a non-authorized value to `0x55` within 60 seconds. A stale `0x55` already present when the connection opens is deliberately not accepted as a new button press. Choose **Retry** and press the physical pairing/learn button only when Home Assistant asks for it.\\n\\nTechnical detail: `{error}`"
+        "description": "Home Assistant stayed connected but C6 did not change to `0x55` after you clicked Continue. Press the physical cabinet button again and retry.\\n\\nTechnical detail: `{error}`"
       },
       "sync_failed": {
-        "title": "Post-pairing synchronization failed",
-        "description": "The cabinet confirmed the physical button press, but Home Assistant could not complete the state reads and date/time synchronization seen in the official app. Choose **Retry** to repeat the full connection and authorization sequence.\\n\\nTechnical detail: `{error}`"
+        "title": "Post-authorization synchronization failed",
+        "description": "C6 confirmed the physical button, but the post-authorization reads or date/time synchronization failed. Retry the full setup.\\n\\nTechnical detail: `{error}`"
       }
     },
     "abort": {
@@ -43,6 +52,5 @@
     "create_entry": {
       "success": "**{name}** was successfully configured with Schneider Ambient BLE."
     }
-  },
-  "title": "Schneider Ambient BLE"
+  }
 }

@@ -2,9 +2,16 @@
 
 Experimental local Home Assistant control for Schneider Ambient Lighting / WSC mirrors and mirror cabinets over Bluetooth Low Energy.
 
+## Confirmed on real hardware
+
+The proprietary C2 color-temperature path has now been independently verified directly from macOS against a real WSC cabinet. The confirmed control sequence is `CE = AF 01` → `C6 = 01 00 03 00` → C2 write. C2 is 8 bytes on the tested device (four big-endian 16-bit Kelvin slots). Both 3000 K (`0B B8` repeated four times) and 6500 K (`19 64` repeated four times) were written and read back successfully.
+
+Version 0.1.9 also changes first authorization to a visible Home Assistant form: HA connects first and confirms C6 is non-authorized, then the user is explicitly told to press the physical cabinet button and click Continue; HA only proceeds after C6 returns `0x55`.
+
+
 > **Status:** reverse-engineering project. Brightness and color temperature are decoded. Power/zone semantics are still experimental.
 >
-> **Current integration version: 0.1.8.** This release fixes the remaining Home Assistant setup-result issue, registers the WSC device immediately, fixes the experimental switch platform import, and requires a fresh C6 non-authorized → `0x55` transition for physical authorization.
+> **Current integration version: 0.1.9.** This release uses the real-hardware-verified C2 payload shape, performs read-back verification, and changes first authorization to a persistent visible button form: connect first → confirm C6 is non-authorized → ask the user to press the cabinet button → Continue → verify C6=`0x55`.
 
 [![Open your Home Assistant instance and open HACS repository](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=aharder3&repository=schneider-ambient-ble&category=integration)
 
@@ -47,7 +54,7 @@ When updating an existing development install, use **Redownload** in HACS and ve
 contains:
 
 ```json
-"version": "0.1.8"
+"version": "0.1.9"
 ```
 
 ## ESPHome Bluetooth Proxy
@@ -68,28 +75,33 @@ bluetooth_proxy:
 Keep Wi-Fi credentials, API keys and OTA passwords in your local `secrets.yaml`; never commit them.
 
 
-### Home Assistant setup-result behavior
+### Home Assistant setup behavior
 
-Version 0.1.8 fixes the completion screen in the config-flow finalization hook (`async_on_create_entry`). The integration registers the WSC device before Home Assistant returns the finished flow to the frontend, explicitly normalizes the returned flow title, and supplies a localized success description. This avoids relying on timing between config-entry setup and the frontend's generic `Created configuration for ...` fallback.
+Version 0.1.9 deliberately separates the physical authorization into a normal Home Assistant form instead of a background progress message. The form is only shown after the Bluetooth/GATT connection is established and C1 plus the initial non-authorized C6 value have been read successfully. The user then presses the physical cabinet button and clicks **Continue**; Home Assistant verifies C6=`0x55` before running the post-authorization reads and clock sync.
 
 ## First authorization / pairing flow
 
-The PacketLogger trace makes the setup order clear:
+The real cabinet has now been verified directly from macOS with this exact order:
 
 ```text
 Discover WSC
    ↓
 Connect Bluetooth/GATT
    ↓
-Complete GATT discovery
-   ↓
 Read C1
    ↓
-Poll C6 every ~0.5 s
+Read initial C6 = 01 00 03 00 00 00 00 00
    ↓
-01 00 03 00 00 00 00 00   waiting
-   ↓ physical cabinet button
-01 55 03 00 00 00 00 00   confirmed
+SHOW A VISIBLE HOME ASSISTANT FORM
+"Bluetooth connected — press the cabinet button now"
+   ↓
+User presses the physical cabinet button
+   ↓
+User clicks Continue
+   ↓
+Home Assistant polls C6 for up to 8 s
+   ↓
+C6 = 01 55 03 00 00 00 00 00
    ↓
 Read current cabinet state
    ↓
@@ -99,19 +111,27 @@ Write current time to C5
 Create Home Assistant entry
 ```
 
-During setup, Home Assistant therefore behaves like the captured Schneider app:
+This is application-level physical authorization. The captured WSC session contains no standard BLE SMP Pairing Request/Response, so the integration does not call `BleakClient.pair()`.
 
-1. It finds WSC.
-2. It establishes the Bluetooth/GATT connection **before** asking for the physical button.
-3. Once connected, the setup screen tells you to press the physical pairing/learn button.
-4. Home Assistant keeps the connection open and reads C6 every 0.5 seconds.
-5. There is **no Continue button to confirm the physical press**. The cabinet itself confirms it by changing C6 from the observed `0x00` state to `0x55`.
-6. Home Assistant then reads the current state and synchronizes date/time.
-7. The config entry is created only if the sequence succeeds.
+## Confirmed color-temperature control
 
-The trace contains no BLE SMP Pairing Request/Response on L2CAP CID `0x0006` and no link-encryption transition for WSC. The integration therefore does not invent a standard `BleakClient.pair()` operation.
+On the tested cabinet C2 is 8 bytes, containing four big-endian 16-bit Kelvin values. Home Assistant now reads the current C2 length first and writes the requested Kelvin value into every slot, matching the successful direct macOS tests.
 
-See [`docs/pairing.md`](docs/pairing.md) for packet-level evidence.
+Examples:
+
+```text
+3000 K → 0B B8 0B B8 0B B8 0B B8
+6500 K → 19 64 19 64 19 64 19 64
+```
+
+The confirmed command sequence is:
+
+```text
+CE → AF 01
+C6 → 01 00 03 00
+C2 → repeated Kelvin payload
+C2 → read-back verification
+```
 
 ## Protocol knowledge
 

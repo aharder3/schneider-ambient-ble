@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.9
+
+- Confirmed color-temperature control directly from macOS against a real WSC cabinet at both 3000 K and 6500 K, including exact C2 read-back.
+- Fixed Home Assistant C2/C3 payload generation: the tested cabinet uses four 16-bit slots (8 bytes), not the previous 4-byte payload. The integration now reads the current characteristic length and writes the requested value to every slot.
+- Rebuilt first authorization UI: Home Assistant connects first, reads C1 and a non-authorized C6 state, then displays a persistent **physical button** form. Only after the user presses the cabinet button and clicks Continue does HA verify C6=`0x55`.
+- Added C2/C3 read-back verification after writes.
+- Added initial brightness/color-temperature reads when the entities are created.
+- Added a generic anonymized macOS CCT verification tool under `tools/`.
+
+
 ## 0.1.8
 
 - Fixed the Home Assistant completion screen at the correct lifecycle point using `async_on_create_entry()`. The WSC device is now registered before the final config-flow result is returned to the frontend.
