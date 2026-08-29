@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.3
+
+- Added a reusable runtime GATT connection with a 120-second idle timeout. The direct macOS latency benchmark measured WSC reconnects at roughly 3.8-6.0 seconds, while writes on an already-open connection completed in roughly 30-240 ms.
+- Use direct hardware-verified C6 writes for normal manual/Automatic zone switching, and reuse the initialized manual BLE session for repeated brightness/color-temperature slider writes. After one `CE=AF 01` + C6 manual-zone preamble, subsequent C2/C3 writes are sent directly while the same connection remains alive.
+- Keep all runtime GATT work serialized and retain whole-operation retry/reconnect behavior when the proxy or peripheral actually drops the link.
+- Release the cached connection cleanly when the Home Assistant config entry unloads.
+- Added `tools/wsc_latency_test.py` for reproducible latency benchmarking.
+
 ## 0.2.2
 
 - Confirmed physical zone mapping on real hardware: **Zone 1 = lower light**, **Zone 2 = upper light**.

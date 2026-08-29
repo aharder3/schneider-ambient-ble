@@ -46,6 +46,7 @@ T = TypeVar("T")
 
 BUTTON_POLL_INTERVAL_SECONDS = 0.5
 BUTTON_VERIFY_TIMEOUT_SECONDS = 8.0
+RUNTIME_IDLE_DISCONNECT_SECONDS = 120.0
 
 POST_AUTH_READ_ORDER = (
     CHAR_DEVICE_INFO,
@@ -100,6 +101,12 @@ class SchneiderBleClient:
         self.hass = hass
         self.address = address
         self._gatt_lock = asyncio.Lock()
+        self._runtime_client: BleakClientWithServiceCache | None = None
+        self._idle_disconnect_task: asyncio.Task[None] | None = None
+        # The macOS latency benchmark proved that direct C2/C3 writes are accepted
+        # after one CE + C6 manual-session preamble. Remember that session while the
+        # same GATT connection is alive so slider updates do not replay the preamble.
+        self._manual_session_zone_mask: int | None = None
 
     def _ble_device(self):
         """Return the currently best connectable BLE path for the device."""
@@ -129,28 +136,93 @@ class SchneiderBleClient:
             max_attempts=4,
         )
 
+    async def _disconnect_runtime_client(self) -> None:
+        """Drop the cached runtime connection and its session state."""
+        client = self._runtime_client
+        self._runtime_client = None
+        self._manual_session_zone_mask = None
+        if client is not None:
+            with suppress(Exception):
+                await client.disconnect()
+
+    async def _idle_disconnect(self, client: BleakClientWithServiceCache) -> None:
+        """Release the BLE connection after a short idle period.
+
+        Connecting to the tested WSC takes roughly 4-6 seconds, while a direct
+        characteristic write only takes tens of milliseconds. Keeping the same
+        GATT connection alive briefly therefore removes almost all perceived delay
+        during normal light-card and slider interaction without permanently holding
+        a Bluetooth-proxy connection slot.
+        """
+        try:
+            await asyncio.sleep(RUNTIME_IDLE_DISCONNECT_SECONDS)
+            async with self._gatt_lock:
+                if self._runtime_client is client:
+                    _LOGGER.debug(
+                        "Schneider runtime BLE connection idle for %.0fs; disconnecting",
+                        RUNTIME_IDLE_DISCONNECT_SECONDS,
+                    )
+                    await self._disconnect_runtime_client()
+        except asyncio.CancelledError:
+            return
+        finally:
+            if self._idle_disconnect_task is asyncio.current_task():
+                self._idle_disconnect_task = None
+
+    def _arm_idle_disconnect(self, client: BleakClientWithServiceCache) -> None:
+        task = self._idle_disconnect_task
+        if task is not None and not task.done():
+            task.cancel()
+        self._idle_disconnect_task = self.hass.async_create_task(
+            self._idle_disconnect(client),
+            "Schneider Ambient idle BLE disconnect",
+        )
+
+    async def _runtime_connection(self) -> BleakClientWithServiceCache:
+        """Return the existing runtime GATT connection or establish it once."""
+        client = self._runtime_client
+        if client is not None and client.is_connected:
+            return client
+
+        if client is not None:
+            await self._disconnect_runtime_client()
+
+        client = await self.open_connection()
+        self._runtime_client = client
+        self._manual_session_zone_mask = None
+        return client
+
     async def _run_gatt_operation(
         self,
         operation: Callable[[BleakClientWithServiceCache], Awaitable["T"]],
         *,
         attempts: int = 3,
     ) -> "T":
-        """Run one complete GATT transaction serially with reconnect retries.
+        """Run one serialized GATT transaction on a reusable connection.
 
-        The direct macOS stress test reconnects cleanly, while ESPHome proxy traces
-        can occasionally drop a connection mid-read. Retrying the *whole* idempotent
-        operation avoids leaving Home Assistant in a failed state after a transient
-        proxy/GATT disconnect.
+        The hardware latency benchmark measured reconnect-per-command at about five
+        seconds on average, versus ~30-240 ms for writes on an already-open link.
+        Runtime operations therefore reuse one connection and only disconnect after
+        an idle timeout. If the proxy/peripheral drops the link, the complete
+        idempotent operation is retried on a fresh connection.
         """
         async with self._gatt_lock:
+            task = self._idle_disconnect_task
+            if task is not None and not task.done():
+                task.cancel()
+                self._idle_disconnect_task = None
+
             last_exc: BaseException | None = None
             for attempt in range(1, attempts + 1):
                 client: BleakClientWithServiceCache | None = None
                 try:
-                    client = await self.open_connection()
-                    return await operation(client)
+                    client = await self._runtime_connection()
+                    result = await operation(client)
+                    self._arm_idle_disconnect(client)
+                    return result
                 except BLEAK_RETRY_EXCEPTIONS as exc:
                     last_exc = exc
+                    await self._disconnect_runtime_client()
                     if attempt >= attempts:
                         raise
                     _LOGGER.debug(
@@ -159,13 +231,19 @@ class SchneiderBleClient:
                         attempts,
                         exc_info=True,
                     )
-                    await asyncio.sleep(0.35 * attempt)
-                finally:
-                    if client is not None:
-                        with suppress(Exception):
-                            await client.disconnect()
+                    await asyncio.sleep(0.20 * attempt)
+
             assert last_exc is not None
             raise last_exc
+
+    async def async_shutdown(self) -> None:
+        """Release a cached runtime GATT connection when the entry unloads."""
+        task = self._idle_disconnect_task
+        if task is not None and not task.done():
+            task.cancel()
+        self._idle_disconnect_task = None
+        async with self._gatt_lock:
+            await self._disconnect_runtime_client()
 
     @staticmethod
     def is_authorized(control_value: bytes | bytearray) -> bool:
@@ -350,16 +428,20 @@ class SchneiderBleClient:
         return values[0] / divisor
 
     async def _write_control(self, payload: bytes) -> bytes:
-        """Write one captured C6 control payload.
+        """Write one captured C6 control payload on the reusable connection.
 
-        Runtime control deliberately avoids an immediate read-back: the direct
-        hardware tests already prove these idempotent C6 commands, and removing the
-        extra GATT read makes ESPHome-proxy operation substantially less fragile.
+        The real-hardware zone and HCL sweeps accepted C6 directly without CE=AF01,
+        and the latency benchmark measured a direct C6 write at ~59 ms. Keep the CE
+        preamble only for the still-experimental night-light command. A standalone
+        C6 write does not prove that C2/C3 are session-primed, so brightness/CCT will
+        initialize their own manual session on the next write.
         """
 
         async def _write(client: BleakClientWithServiceCache) -> bytes:
-            await client.write_gatt_char(CHAR_SESSION, SESSION_INIT, response=True)
+            if payload == CONTROL_NIGHTLIGHT:
+                await client.write_gatt_char(CHAR_SESSION, SESSION_INIT, response=True)
             await client.write_gatt_char(CHAR_CONTROL, payload, response=True)
+            self._manual_session_zone_mask = None
             _LOGGER.debug("Schneider C6 write: %s", payload.hex(" "))
             return payload
 
@@ -440,10 +522,16 @@ class SchneiderBleClient:
             cct_payload = encoded * 4
 
         async def _write(client: BleakClientWithServiceCache) -> tuple[bytes | None, bytes | None]:
-            await client.write_gatt_char(CHAR_SESSION, SESSION_INIT, response=True)
-            await client.write_gatt_char(
-                CHAR_CONTROL, self._manual_control(zone_mask), response=True
-            )
+            # The direct latency benchmark proved that once CE=AF01 + the manual C6
+            # mask have initialized a live connection, subsequent C2/C3 writes can
+            # be sent directly. This cuts slider writes to tens of milliseconds.
+            if self._manual_session_zone_mask != zone_mask:
+                await client.write_gatt_char(CHAR_SESSION, SESSION_INIT, response=True)
+                await client.write_gatt_char(
+                    CHAR_CONTROL, self._manual_control(zone_mask), response=True
+                )
+                self._manual_session_zone_mask = zone_mask
+
             if brightness_payload is not None:
                 await client.write_gatt_char(
                     CHAR_BRIGHTNESS, brightness_payload, response=True

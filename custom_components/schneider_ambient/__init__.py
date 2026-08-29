@@ -64,4 +64,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    """Unload entities and release the cached runtime BLE connection."""
+    runtime = entry.runtime_data
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if unload_ok and isinstance(runtime, SchneiderAmbientDevice):
+        await runtime.client.async_shutdown()
+    return unload_ok
