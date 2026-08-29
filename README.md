@@ -26,7 +26,7 @@ The second PacketLogger capture confirms that manual mode stores the two-light m
 
 > **Status:** reverse-engineering project. Color temperature is independently real-hardware verified. Separate-zone C6 values and the Automatic/HCL `0x02` format are directly observed in the official-app capture. The immediate Night-light C6 state is implemented from the capture and should still be treated as experimental until independently replayed from macOS.
 >
-> **Current integration version: 0.2.1.** Home Assistant exposes one master light, two on/off-only zone lights, an Automatic/HCL switch and a Night-light switch.
+> **Current integration version: 0.2.2.** Home Assistant exposes one master light, two on/off-only zone lights, an Automatic/HCL switch and a Night-light switch.
 
 [![Open your Home Assistant instance and open HACS repository](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=aharder3&repository=schneider-ambient-ble&category=integration)
 
@@ -69,7 +69,7 @@ When updating an existing development install, use **Redownload** in HACS and ve
 contains:
 
 ```json
-"version": "0.2.1"
+"version": "0.2.2"
 ```
 
 ## Home Assistant controls
@@ -83,6 +83,20 @@ After setup the device page should contain five active controls:
 5. **Night light** (`switch`) — activates/deactivates the captured night-light mode.
 
 Brightness and color temperature are intentionally only present on the master light because the tested cabinet applies those values globally to both main lights. The old development entities `Brightness`, `Color temperature` and `Power (experimental)` are removed from the entity registry so they do not remain as duplicates.
+
+
+## Real-hardware protocol sweep (v0.2.2)
+
+A complete direct-macOS sweep confirmed the two-light model used by this integration:
+
+- manual Zone 1 = **lower light** (`01 00 01 00`)
+- manual Zone 2 = **upper light** (`01 00 02 00`)
+- both = `01 00 03 00`; off = `00 00 00 00`
+- Automatic/HCL uses `02 00 00 <zone mask>`
+- C2 colour temperature works throughout 2000–6500 K and must update all four 16-bit slots (8 bytes)
+- C3 brightness works from 1–100 %
+
+Brightness and colour temperature are global hardware settings. Home Assistant exposes them on **both** zone light entities for a natural light-card experience; changing either entity updates the shared value on the cabinet while the two on/off states remain independent. Runtime operations are serialized and retried across transient GATT disconnects to improve ESPHome Bluetooth Proxy reliability.
 
 ## ESPHome Bluetooth Proxy
 

@@ -34,15 +34,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         model="Ambient Lighting / WSC",
     )
 
-    # v0.2.0 replaces the old separate Number + experimental Power entities with
-    # one native Home Assistant light and an Automatic-mode switch. Remove stale
-    # registry entries from development versions so the device page stays clean.
+    # Remove stale registry entries from earlier development layouts so the device
+    # page only contains the current two zone lights and mode switches.
     entity_registry = er.async_get(hass)
     legacy_base = entry.unique_id or entry.entry_id
     for platform, unique_id in (
         ("number", f"{legacy_base}_brightness"),
         ("number", f"{legacy_base}_color_temperature"),
         ("switch", f"{legacy_base}_power_experimental"),
+        ("light", f"{legacy_base}_light"),
     ):
         entity_id = entity_registry.async_get_entity_id(platform, DOMAIN, unique_id)
         if entity_id is not None:

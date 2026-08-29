@@ -31,11 +31,10 @@ ZONE_1 = 0x01
 ZONE_2 = 0x02
 ZONE_ALL = ZONE_1 | ZONE_2
 
-# Physical naming is currently mapped as Zone 1 = upper and Zone 2 = lower.
-# The zone-mask behavior itself is capture-confirmed; if a cabinet has reversed
-# physical wiring these two constants are the only mapping that needs swapping.
-ZONE_UPPER = ZONE_1
-ZONE_LOWER = ZONE_2
+# Physical mapping confirmed on real hardware by the macOS protocol sweep:
+# Zone 1 = lower light, Zone 2 = upper light.
+ZONE_LOWER = ZONE_1
+ZONE_UPPER = ZONE_2
 
 CONTROL_OFF = bytes([0x00, 0x00, 0x00, 0x00])
 CONTROL_NIGHTLIGHT = bytes([0x00, 0x00, 0x00, 0x02])

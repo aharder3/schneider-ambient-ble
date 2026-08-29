@@ -1,10 +1,17 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Awaitable, Callable
+from contextlib import suppress
 from dataclasses import dataclass
 import logging
+from typing import TypeVar
 
-from bleak_retry_connector import BleakClientWithServiceCache, establish_connection
+from bleak_retry_connector import (
+    BLEAK_RETRY_EXCEPTIONS,
+    BleakClientWithServiceCache,
+    establish_connection,
+)
 
 from homeassistant.components import bluetooth
 from homeassistant.components.bluetooth import BluetoothReachabilityIntent
@@ -34,6 +41,8 @@ from .const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+T = TypeVar("T")
 
 BUTTON_POLL_INTERVAL_SECONDS = 0.5
 BUTTON_VERIFY_TIMEOUT_SECONDS = 8.0
@@ -90,6 +99,7 @@ class SchneiderBleClient:
     def __init__(self, hass: HomeAssistant, address: str) -> None:
         self.hass = hass
         self.address = address
+        self._gatt_lock = asyncio.Lock()
 
     def _ble_device(self):
         """Return the currently best connectable BLE path for the device."""
@@ -116,8 +126,46 @@ class SchneiderBleClient:
             BleakClientWithServiceCache,
             ble_device,
             ble_device.name or "Schneider Ambient",
-            max_attempts=3,
+            max_attempts=4,
         )
+
+    async def _run_gatt_operation(
+        self,
+        operation: Callable[[BleakClientWithServiceCache], Awaitable["T"]],
+        *,
+        attempts: int = 3,
+    ) -> "T":
+        """Run one complete GATT transaction serially with reconnect retries.
+
+        The direct macOS stress test reconnects cleanly, while ESPHome proxy traces
+        can occasionally drop a connection mid-read. Retrying the *whole* idempotent
+        operation avoids leaving Home Assistant in a failed state after a transient
+        proxy/GATT disconnect.
+        """
+        async with self._gatt_lock:
+            last_exc: BaseException | None = None
+            for attempt in range(1, attempts + 1):
+                client: BleakClientWithServiceCache | None = None
+                try:
+                    client = await self.open_connection()
+                    return await operation(client)
+                except BLEAK_RETRY_EXCEPTIONS as exc:
+                    last_exc = exc
+                    if attempt >= attempts:
+                        raise
+                    _LOGGER.debug(
+                        "Schneider GATT operation failed on attempt %d/%d; reconnecting",
+                        attempt,
+                        attempts,
+                        exc_info=True,
+                    )
+                    await asyncio.sleep(0.35 * attempt)
+                finally:
+                    if client is not None:
+                        with suppress(Exception):
+                            await client.disconnect()
+            assert last_exc is not None
+            raise last_exc
 
     @staticmethod
     def is_authorized(control_value: bytes | bytearray) -> bool:
@@ -261,49 +309,61 @@ class SchneiderBleClient:
 
     async def read_control_state(self) -> SchneiderControlState:
         """Read power/mode/zones, brightness and color temperature."""
-        client = await self.open_connection()
-        try:
+
+        async def _read(client: BleakClientWithServiceCache) -> SchneiderControlState:
             control = bytes(await client.read_gatt_char(CHAR_CONTROL))
             c3 = bytes(await client.read_gatt_char(CHAR_BRIGHTNESS))
             c2 = bytes(await client.read_gatt_char(CHAR_CCT))
-        finally:
-            await client.disconnect()
 
-        is_on, automatic, nightlight, zone_mask = self._decode_control(control)
-        brightness = None
-        cct = None
-        if len(c3) >= 2:
-            brightness = int.from_bytes(c3[:2], "big") / 100.0
-        if len(c2) >= 2:
-            cct = int.from_bytes(c2[:2], "big")
+            is_on, automatic, nightlight, zone_mask = self._decode_control(control)
+            brightness = self._decode_uniform_u16(c3, divisor=100.0, label="C3")
+            cct_value = self._decode_uniform_u16(c2, divisor=1.0, label="C2")
+            cct = round(cct_value) if cct_value is not None else None
 
-        return SchneiderControlState(
-            is_on=is_on,
-            brightness_percent=brightness,
-            color_temp_kelvin=cct,
-            automatic_mode=automatic,
-            nightlight_mode=nightlight,
-            zone_mask=zone_mask,
-            raw_control=control,
-        )
+            return SchneiderControlState(
+                is_on=is_on,
+                brightness_percent=brightness,
+                color_temp_kelvin=cct,
+                automatic_mode=automatic,
+                nightlight_mode=nightlight,
+                zone_mask=zone_mask,
+                raw_control=control,
+            )
+
+        return await self._run_gatt_operation(_read)
+
+    @staticmethod
+    def _decode_uniform_u16(
+        payload: bytes, *, divisor: float, label: str
+    ) -> float | None:
+        """Decode all 16-bit slots and warn if the cabinet reports mixed values."""
+        if len(payload) < 2 or len(payload) % 2:
+            return None
+        values = [
+            int.from_bytes(payload[index : index + 2], "big")
+            for index in range(0, len(payload), 2)
+        ]
+        if len(set(values)) != 1:
+            _LOGGER.warning(
+                "Schneider %s returned mixed 16-bit slots: %s", label, values
+            )
+        return values[0] / divisor
 
     async def _write_control(self, payload: bytes) -> bytes:
-        """Write one captured C6 control payload and return the resulting C6 state."""
-        client = await self.open_connection()
-        try:
-            # AF 01 is observed repeatedly around mode/control groups and is known
-            # to be accepted by the tested cabinet before C6 writes.
+        """Write one captured C6 control payload.
+
+        Runtime control deliberately avoids an immediate read-back: the direct
+        hardware tests already prove these idempotent C6 commands, and removing the
+        extra GATT read makes ESPHome-proxy operation substantially less fragile.
+        """
+
+        async def _write(client: BleakClientWithServiceCache) -> bytes:
             await client.write_gatt_char(CHAR_SESSION, SESSION_INIT, response=True)
             await client.write_gatt_char(CHAR_CONTROL, payload, response=True)
-            readback = bytes(await client.read_gatt_char(CHAR_CONTROL))
-            _LOGGER.debug(
-                "Schneider C6 write %s -> read-back %s",
-                payload.hex(" "),
-                readback.hex(" "),
-            )
-            return readback
-        finally:
-            await client.disconnect()
+            _LOGGER.debug("Schneider C6 write: %s", payload.hex(" "))
+            return payload
+
+        return await self._run_gatt_operation(_write)
 
     async def set_main_power(self, on: bool, *, automatic: bool = False) -> bytes:
         """Turn both main light zones on or turn all main light zones off."""
@@ -348,11 +408,15 @@ class SchneiderBleClient:
         color_temp_kelvin: int | None = None,
         zone_mask: int = ZONE_ALL,
     ) -> tuple[bytes | None, bytes | None]:
-        """Apply global brightness/CCT and verify read-back in one GATT session.
+        """Apply global brightness/CCT in one resilient GATT transaction.
 
-        Brightness and color temperature are global controls for the tested
-        two-light cabinet. The C6 manual preamble preserves the currently active
-        zone mask instead of forcing a disabled zone back on.
+        Real-hardware sweep results:
+        - C2 must be written as all four 16-bit slots (8 bytes). A 4-byte C2 write
+          changed only the first two slots and left the remaining two stale.
+        - C3 accepts 4 bytes, but the verified 8-byte form also works for every
+          tested value from 1 to 100 %. Using 8 bytes for both characteristics
+          gives deterministic state across all slots and avoids preliminary reads.
+        - C6 preserves the currently active zone mask instead of forcing both lights.
         """
         if brightness_percent is None and color_temp_kelvin is None:
             await self.set_zone_mask(zone_mask, automatic=False)
@@ -362,60 +426,33 @@ class SchneiderBleClient:
         if zone_mask == 0:
             zone_mask = ZONE_ALL
 
-        client = await self.open_connection()
-        try:
-            brightness_payload = None
-            cct_payload = None
+        brightness_payload = None
+        cct_payload = None
 
-            if brightness_percent is not None:
-                percent = max(10.0, min(100.0, float(brightness_percent)))
-                current_c3 = bytes(await client.read_gatt_char(CHAR_BRIGHTNESS))
-                brightness_payload = self._uniform_u16_payload(
-                    current_c3, round(percent * 100)
-                )
+        if brightness_percent is not None:
+            percent = max(1.0, min(100.0, float(brightness_percent)))
+            encoded = round(percent * 100).to_bytes(2, "big")
+            brightness_payload = encoded * 4
 
-            if color_temp_kelvin is not None:
-                kelvin = int(color_temp_kelvin)
-                if not 2000 <= kelvin <= 6500:
-                    raise ValueError(
-                        "Color temperature must be between 2000 and 6500 K"
-                    )
-                current_c2 = bytes(await client.read_gatt_char(CHAR_CCT))
-                cct_payload = self._uniform_u16_payload(current_c2, kelvin)
+        if color_temp_kelvin is not None:
+            kelvin = max(2000, min(6500, int(color_temp_kelvin)))
+            encoded = kelvin.to_bytes(2, "big")
+            cct_payload = encoded * 4
 
+        async def _write(client: BleakClientWithServiceCache) -> tuple[bytes | None, bytes | None]:
             await client.write_gatt_char(CHAR_SESSION, SESSION_INIT, response=True)
             await client.write_gatt_char(
-                CHAR_CONTROL,
-                self._manual_control(zone_mask),
-                response=True,
+                CHAR_CONTROL, self._manual_control(zone_mask), response=True
             )
-
             if brightness_payload is not None:
                 await client.write_gatt_char(
                     CHAR_BRIGHTNESS, brightness_payload, response=True
                 )
-                brightness_readback = bytes(
-                    await client.read_gatt_char(CHAR_BRIGHTNESS)
-                )
-                if brightness_readback != brightness_payload:
-                    raise RuntimeError(
-                        "Schneider brightness write completed but read-back differs: "
-                        f"wanted {brightness_payload.hex(' ')}, "
-                        f"got {brightness_readback.hex(' ')}"
-                    )
-
             if cct_payload is not None:
                 await client.write_gatt_char(CHAR_CCT, cct_payload, response=True)
-                cct_readback = bytes(await client.read_gatt_char(CHAR_CCT))
-                if cct_readback != cct_payload:
-                    raise RuntimeError(
-                        "Schneider CCT write completed but read-back differs: "
-                        f"wanted {cct_payload.hex(' ')}, got {cct_readback.hex(' ')}"
-                    )
-
             return brightness_payload, cct_payload
-        finally:
-            await client.disconnect()
+
+        return await self._run_gatt_operation(_write)
 
     async def set_color_temperature_kelvin(
         self, kelvin: int, *, zone_mask: int = ZONE_ALL

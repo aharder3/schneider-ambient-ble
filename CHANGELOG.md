@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.2
+
+- Confirmed physical zone mapping on real hardware: **Zone 1 = lower light**, **Zone 2 = upper light**.
+- Expose brightness and tunable-white colour temperature directly on both `Licht oben` and `Licht unten`; those values are shared by the cabinet as required by the hardware.
+- Remove the separate master light entity from the current layout.
+- Confirmed C2 (colour temperature) across 2000–6500 K. C2 requires the full 8-byte/four-slot payload; a 4-byte write only updates half the returned slots.
+- Confirmed C3 brightness across 1–100 %. The integration now permits brightness below the previous 10 % floor.
+- Confirmed Automatic/HCL C6 masks for zone 1, zone 2 and both zones.
+- Add serialized runtime GATT operations and whole-operation reconnect retries for transient ESPHome Bluetooth Proxy disconnects.
+- Reduce proxy traffic by using the verified fixed 8-byte C2/C3 writes and avoiding redundant per-command read-backs.
+
 ## 0.2.1
 
 - Added two separate on/off-only Home Assistant light entities for the cabinet's two physical light zones. Brightness and color temperature remain global on the master light.
