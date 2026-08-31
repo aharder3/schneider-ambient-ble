@@ -26,7 +26,7 @@ The second PacketLogger capture confirms that manual mode stores the two-light m
 
 > **Status:** reverse-engineering project. Color temperature is independently real-hardware verified. Separate-zone C6 values and the Automatic/HCL `0x02` format are directly observed in the official-app capture. The immediate Night-light C6 state is implemented from the capture and should still be treated as experimental until independently replayed from macOS.
 >
-> **Current integration version: 0.2.5.** Manual setup always presents a Bluetooth-device picker, then lets you choose the device name before physical authorization. Runtime control exposes two zone lights with shared brightness/color temperature, Automatic/HCL and Night-light.
+> **Current integration version: 0.2.6.** Both manual setup and Home Assistant Bluetooth-discovery setup now require an explicit Bluetooth-device selection, followed by the custom device name. An already-present C6=`0x55` authorization marker is handled as an existing authorization instead of an error. Runtime control exposes two zone lights with shared brightness/color temperature, Automatic/HCL and Night-light.
 
 [![Open your Home Assistant instance and open HACS repository](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=aharder3&repository=schneider-ambient-ble&category=integration)
 
@@ -69,7 +69,7 @@ When updating an existing development install, use **Redownload** in HACS and ve
 contains:
 
 ```json
-"version": "0.2.5"
+"version": "0.2.6"
 ```
 
 ## Home Assistant controls
@@ -85,7 +85,9 @@ Brightness and color temperature are hardware-global values. They are shown on b
 
 ## Manual Bluetooth selection during setup
 
-Starting with 0.2.5, a user-initiated setup performs an active scan and **always shows a manual Bluetooth-device picker**. All connectable devices currently visible through Home Assistant's local adapters and Bluetooth proxies are listed. Known WSC advertisements are marked with `✓` and sorted first, but the flow intentionally allows selecting another entry because some proxy paths can expose incomplete advertisement metadata. The selected device is then validated by opening GATT and reading the proprietary WSC C1/C6 characteristics.
+Starting with 0.2.6, **both** user-initiated setup and setup opened from Home Assistant's automatic Bluetooth discovery show the manual Bluetooth-device picker. The picker first uses Home Assistant's current connectable-device cache and provides **Scan again / Erneut suchen** for an active scan. Known WSC advertisements are marked with `✓` and sorted first, but another device can still be selected because some proxy paths expose incomplete advertisement metadata. The selected device is then validated by opening GATT and reading the proprietary WSC C1/C6 characteristics.
+
+If C6 already contains the physical authorization marker `0x55` when the connection opens, 0.2.6 no longer reports an error. It shows an **already authorized** confirmation screen and continues with the normal post-authorization synchronization.
 
 The device-name step follows the Bluetooth selection and still occurs before the slower GATT authorization connection is opened.
 

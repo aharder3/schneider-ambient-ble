@@ -16,7 +16,6 @@ from homeassistant.helpers import device_registry as dr
 from .ble import (
     SchneiderAuthorizationTimeout,
     SchneiderBleClient,
-    SchneiderUnexpectedAuthorizationState,
 )
 from .const import DOMAIN, SERVICE_UUID
 from .helpers import DEFAULT_DEVICE_NAME, normalize_device_name
@@ -53,42 +52,58 @@ class SchneiderAmbientConfigFlow(ConfigFlow, domain=DOMAIN):
         self._setup_client: BleakClientWithServiceCache | None = None
         self._last_error = "No additional error information"
         self._configured_name: str | None = None
+        self._already_authorized = False
+
+    def _load_cached_devices(
+        self, extra: BluetoothServiceInfoBleak | None = None
+    ) -> None:
+        """Load the current HA Bluetooth cache for the manual picker.
+
+        This is intentionally used for both user-started setup and Bluetooth
+        discovery setup. Previously the Bluetooth discovery path bypassed the
+        manual picker completely, which is why users could go straight from a
+        discovered WSC card into setup without ever seeing the device list.
+        """
+        found: dict[str, BluetoothServiceInfoBleak] = {}
+        for info in bluetooth.async_discovered_service_info(
+            self.hass, connectable=True
+        ):
+            found.setdefault(info.address, info)
+        if extra is not None:
+            found[extra.address] = extra
+        self._discovered_devices = found
 
     @override
     async def async_step_bluetooth(
         self, discovery_info: BluetoothServiceInfoBleak
     ) -> ConfigFlowResult:
+        """Handle HA Bluetooth discovery but still require manual selection."""
         if not _is_supported(discovery_info):
             return self.async_abort(reason="not_supported")
 
-        self._discovery_info = discovery_info
-        await self.async_set_unique_id(discovery_info.address)
-        self._abort_if_unique_id_configured()
+        # Abort an already-configured cabinet without binding this flow's unique ID
+        # yet; the user may intentionally pick a different Bluetooth device below.
+        if any(
+            entry.unique_id == discovery_info.address
+            for entry in self._async_current_entries()
+        ):
+            return self.async_abort(reason="already_configured")
+
         self.context["title_placeholders"] = {"name": _device_name(discovery_info)}
-        return await self.async_step_bluetooth_confirm()
-
-    async def async_step_bluetooth_confirm(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
-        assert self._discovery_info is not None
-        if user_input is not None:
-            return await self.async_step_name()
-
-        self._set_confirm_only()
-        return self.async_show_form(
-            step_id="bluetooth_confirm",
-            description_placeholders={
-                "name": self.context["title_placeholders"]["name"]
-            },
-        )
+        self._load_cached_devices(discovery_info)
+        self._scan_task = None
+        return await self.async_step_select_device()
 
     @override
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
+        """Start manual setup with a Bluetooth-device picker."""
         self.context["title_placeholders"] = {"name": DEFAULT_DEVICE_NAME}
-        self._discovered_devices = {}
+        self._load_cached_devices()
         self._scan_task = None
+        if self._discovered_devices:
+            return await self.async_step_select_device()
         return await self.async_step_scan()
 
     async def _async_scan_for_devices(self) -> None:
@@ -267,10 +282,11 @@ class SchneiderAmbientConfigFlow(ConfigFlow, domain=DOMAIN):
             _, initial_c6 = await SchneiderBleClient.read_pre_authorization_state(
                 self._setup_client
             )
-            if SchneiderBleClient.is_authorized(initial_c6):
-                raise SchneiderUnexpectedAuthorizationState(
-                    "C6 already contained 0x55 before the physical-button prompt: "
-                    f"{initial_c6.hex(' ')}"
+            self._already_authorized = SchneiderBleClient.is_authorized(initial_c6)
+            if self._already_authorized:
+                _LOGGER.info(
+                    "Schneider/WSC already reports authorization marker C6=%s",
+                    initial_c6.hex(" "),
                 )
         except Exception as err:  # noqa: BLE001
             self._last_error = f"{type(err).__name__}: {err}"
@@ -283,9 +299,31 @@ class SchneiderAmbientConfigFlow(ConfigFlow, domain=DOMAIN):
             await self._async_close_setup_client()
             return self.async_show_progress_done(next_step_id="connect_failed")
 
+        if self._already_authorized:
+            return self.async_show_progress_done(next_step_id="already_authorized")
+
         # IMPORTANT: this is a real form, not a progress message. It remains visible
         # until the user physically presses the cabinet button and clicks Continue.
         return self.async_show_progress_done(next_step_id="press_button")
+
+    async def async_step_already_authorized(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Explain a persisted 0x55 state instead of treating it as an error."""
+        if user_input is None:
+            self._set_confirm_only()
+            return self.async_show_form(step_id="already_authorized", last_step=False)
+
+        if self._setup_client is None or not self._setup_client.is_connected:
+            self._last_error = (
+                "Bluetooth/GATT connection was lost after the cabinet reported "
+                "an existing authorization"
+            )
+            await self._async_close_setup_client()
+            return await self.async_step_connection_lost()
+
+        self._sync_task = None
+        return await self.async_step_sync()
 
     async def async_step_press_button(
         self, user_input: dict[str, Any] | None = None

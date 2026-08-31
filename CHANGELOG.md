@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.6
+
+- Fixed setup started from Home Assistant Bluetooth discovery: it now shows the same mandatory manual Bluetooth-device picker as user-started setup instead of bypassing directly to the discovered WSC.
+- The picker is populated immediately from Home Assistant's connectable Bluetooth cache; **Erneut suchen / Scan again** performs an active scan when needed.
+- A selected device is only assigned as the config-flow unique ID after the user explicitly chooses it.
+- Treat an initial C6 authorization marker `0x55` as an already-authorized cabinet instead of a connection/setup error. A dedicated confirmation screen explains the persisted authorization before synchronization continues.
+
 ## 0.2.5
 
 - Manual setup now always shows a Bluetooth-device picker instead of silently auto-selecting the only WSC candidate.

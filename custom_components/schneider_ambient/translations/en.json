@@ -3,7 +3,7 @@
   "config": {
     "flow_title": "Schneider Ambient BLE",
     "progress": {
-      "scanning": "Searching for a connectable Schneider/WSC mirror cabinet",
+      "scanning": "Actively scanning for Bluetooth devices",
       "connecting": "Connecting to the Schneider/WSC cabinet over Bluetooth/GATT",
       "verifying_button": "Checking C6 for the cabinet's physical authorization marker (0x55)",
       "syncing": "Physical authorization confirmed. Reading the cabinet state and synchronizing date/time."
@@ -15,7 +15,7 @@
       },
       "select_device": {
         "title": "Select Bluetooth device",
-        "description": "Select the Bluetooth device that belongs to the Schneider/WSC mirror cabinet. All connectable Bluetooth devices currently visible to Home Assistant are listed. Devices whose advertisement already matches Schneider/WSC are marked with ✓ and sorted first. If the cabinet is missing, choose Scan again.",
+        "description": "**Always manually select** the Bluetooth device that belongs to the Schneider/WSC mirror cabinet. This picker is shown both for user-started setup and when Home Assistant already discovered WSC over Bluetooth. All connectable devices currently present in Home Assistant’s Bluetooth cache are listed. Schneider/WSC matches are marked with ✓ and sorted first. If the cabinet is missing, choose Scan again for an active scan.",
         "data": {
           "address": "Bluetooth device"
         }
@@ -53,6 +53,10 @@
         "data_description": {
           "display_name": "Custom Home Assistant name for the Schneider/WSC mirror cabinet."
         }
+      },
+      "already_authorized": {
+        "title": "Mirror cabinet is already authorized",
+        "description": "The Bluetooth/GATT connection is established and C6 already contains the authorization marker `0x55`. This is **not a connection error**. Physical authorization is already present; click **Continue** to synchronize state and date/time."
       }
     },
     "abort": {

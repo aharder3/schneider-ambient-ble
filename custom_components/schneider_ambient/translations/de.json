@@ -3,7 +3,7 @@
   "config": {
     "flow_title": "Schneider Ambient BLE",
     "progress": {
-      "scanning": "Suche nach einem verbindbaren Schneider/WSC-Spiegelschrank",
+      "scanning": "Bluetooth-Geräte werden aktiv gesucht",
       "connecting": "Bluetooth-/GATT-Verbindung zum Schneider/WSC-Spiegelschrank wird hergestellt",
       "verifying_button": "C6 wird auf die physische Freigabebestätigung des Spiegelschranks (0x55) geprüft",
       "syncing": "Physische Freigabe bestätigt. Gerätestatus wird gelesen und Datum/Uhrzeit werden synchronisiert."
@@ -15,7 +15,7 @@
       },
       "select_device": {
         "title": "Bluetooth-Gerät auswählen",
-        "description": "Wähle manuell das Bluetooth-Gerät aus, das zu deinem Schneider/WSC-Spiegelschrank gehört. Es werden alle aktuell in Home Assistant sichtbaren, verbindbaren Bluetooth-Geräte angezeigt. Bereits eindeutig als Schneider/WSC erkannte Geräte sind mit ✓ markiert und stehen oben. Fehlt der Spiegelschrank, wähle „Erneut suchen“.",
+        "description": "Wähle **immer manuell** das Bluetooth-Gerät aus, das zu deinem Schneider/WSC-Spiegelschrank gehört. Diese Auswahl erscheint sowohl beim manuellen Hinzufügen als auch dann, wenn Home Assistant den WSC bereits automatisch über Bluetooth gefunden hat. Alle aktuell im HA-Bluetooth-Cache sichtbaren, verbindbaren Geräte werden angezeigt. Als Schneider/WSC erkannte Geräte sind mit ✓ markiert und stehen oben. Fehlt der Spiegelschrank, wähle „Erneut suchen“ für einen aktiven Scan.",
         "data": {
           "address": "Bluetooth-Gerät"
         }
@@ -53,6 +53,10 @@
         "data_description": {
           "display_name": "Frei wählbarer Name für den Schneider/WSC-Spiegelschrank in Home Assistant."
         }
+      },
+      "already_authorized": {
+        "title": "Spiegelschrank ist bereits autorisiert",
+        "description": "Die Bluetooth-/GATT-Verbindung steht und C6 enthält bereits die Freigabemarkierung `0x55`. Das ist **kein Verbindungsfehler**. Die physische Freigabe ist bereits vorhanden; klicke auf **Weiter**, um Status sowie Datum/Uhrzeit zu synchronisieren."
       }
     },
     "abort": {
