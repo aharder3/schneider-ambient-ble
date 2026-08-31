@@ -15,7 +15,7 @@
       },
       "select_device": {
         "title": "Bluetooth-Gerät auswählen",
-        "description": "Wähle **immer manuell** das Bluetooth-Gerät aus, das zu deinem Schneider/WSC-Spiegelschrank gehört. Diese Auswahl erscheint sowohl beim manuellen Hinzufügen als auch dann, wenn Home Assistant den WSC bereits automatisch über Bluetooth gefunden hat. Alle aktuell im HA-Bluetooth-Cache sichtbaren, verbindbaren Geräte werden angezeigt. Als Schneider/WSC erkannte Geräte sind mit ✓ markiert und stehen oben. Fehlt der Spiegelschrank, wähle „Erneut suchen“ für einen aktiven Scan.",
+        "description": "Wähle **immer manuell** das Bluetooth-Gerät aus, das zu deinem Schneider/WSC-Spiegelschrank gehört. Diese Auswahl erscheint sowohl beim manuellen Hinzufügen als auch dann, wenn Home Assistant den WSC bereits automatisch über Bluetooth gefunden hat. Alle aktuell im HA-Bluetooth-Cache sichtbaren, verbindbaren Geräte werden angezeigt. Als Schneider/WSC erkannte Geräte sind mit ✓ markiert und stehen oben. Fehlt der Spiegelschrank, wähle „Erneut suchen“ für einen aktiven Scan. Ein erneuter Scan dauert ungefähr 8 Sekunden; danach wird die Geräteliste erneut angezeigt.",
         "data": {
           "address": "Bluetooth-Gerät"
         }

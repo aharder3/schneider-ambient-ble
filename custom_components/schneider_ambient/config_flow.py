@@ -153,8 +153,9 @@ class SchneiderAmbientConfigFlow(ConfigFlow, domain=DOMAIN):
         try:
             self._scan_task.result()
         except Exception:  # noqa: BLE001
+            # Preserve the last known cache so a failed active rescan does not wipe
+            # the picker. The user can retry without restarting the whole flow.
             _LOGGER.exception("Bluetooth scan for Schneider/WSC devices failed")
-            self._discovered_devices = {}
         return self.async_show_progress_done(next_step_id="select_device")
 
     async def async_step_select_device(
@@ -167,8 +168,10 @@ class SchneiderAmbientConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             selected = user_input[CONF_ADDRESS]
             if selected == RESCAN_OPTION:
+                # Keep the previous cache while the active scan runs. If the scan
+                # fails, the user still gets the last known device list instead of
+                # an empty picker. The scan task itself refreshes the cache on success.
                 self._scan_task = None
-                self._discovered_devices = {}
                 return await self.async_step_scan()
             return await self._async_use_selected_address(selected)
 
@@ -180,13 +183,27 @@ class SchneiderAmbientConfigFlow(ConfigFlow, domain=DOMAIN):
             name = (info.name or "").casefold()
             return supported_rank, signal_rank, name
 
-        choices: dict[str, str] = {RESCAN_OPTION: "↻ Scan again / Erneut suchen"}
-        for address, info in sorted(self._discovered_devices.items(), key=sort_key):
+        # Home Assistant preselects the first value in a vol.In picker. In v0.2.6
+        # the rescan action was inserted first, so the form defaulted to "Scan again"
+        # and pressing Continue could appear to loop forever. Put real devices first,
+        # explicitly default to the best WSC candidate, and keep rescan as the last item.
+        sorted_devices = sorted(self._discovered_devices.items(), key=sort_key)
+        choices: dict[str, str] = {}
+        default_address: str | None = None
+        for address, info in sorted_devices:
+            if default_address is None:
+                default_address = address
             choices[address] = self._device_choice_label(info)
+        choices[RESCAN_OPTION] = "↻ Scan again / Erneut suchen"
 
+        assert default_address is not None
         return self.async_show_form(
             step_id="select_device",
-            data_schema=vol.Schema({vol.Required(CONF_ADDRESS): vol.In(choices)}),
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_ADDRESS, default=default_address): vol.In(choices)
+                }
+            ),
         )
 
     async def _async_use_selected_address(self, address: str) -> ConfigFlowResult:

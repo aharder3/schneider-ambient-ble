@@ -26,7 +26,7 @@ The second PacketLogger capture confirms that manual mode stores the two-light m
 
 > **Status:** reverse-engineering project. Color temperature is independently real-hardware verified. Separate-zone C6 values and the Automatic/HCL `0x02` format are directly observed in the official-app capture. The immediate Night-light C6 state is implemented from the capture and should still be treated as experimental until independently replayed from macOS.
 >
-> **Current integration version: 0.2.6.** Both manual setup and Home Assistant Bluetooth-discovery setup now require an explicit Bluetooth-device selection, followed by the custom device name. An already-present C6=`0x55` authorization marker is handled as an existing authorization instead of an error. Runtime control exposes two zone lights with shared brightness/color temperature, Automatic/HCL and Night-light.
+> **Current integration version: 0.2.7.** Both manual setup and Home Assistant Bluetooth-discovery setup now require an explicit Bluetooth-device selection, followed by the custom device name. An already-present C6=`0x55` authorization marker is handled as an existing authorization instead of an error. Runtime control exposes two zone lights with shared brightness/color temperature, Automatic/HCL and Night-light.
 
 [![Open your Home Assistant instance and open HACS repository](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=aharder3&repository=schneider-ambient-ble&category=integration)
 
@@ -69,7 +69,7 @@ When updating an existing development install, use **Redownload** in HACS and ve
 contains:
 
 ```json
-"version": "0.2.6"
+"version": "0.2.7"
 ```
 
 ## Home Assistant controls
@@ -136,6 +136,10 @@ Version 0.2.1 retains the physical authorization as a normal Home Assistant form
 ## Device name during setup
 
 Before Home Assistant opens the Bluetooth/GATT authorization connection, the setup flow asks for a device name. The default is `Schneider Ambient`, but it can be changed to a room/device name such as `Bad Spiegelschrank`. That title is used for the Home Assistant config entry and device registry; the upper/lower light entities remain attached to the named device.
+
+## Bluetooth device picker
+
+Version 0.2.7 fixes the manual picker so a real Bluetooth device is selected by default. Schneider/WSC matches are sorted first; **Scan again / Erneut suchen** is a separate last option. An active rescan takes about eight seconds and then returns to the refreshed picker.
 
 ## First authorization / pairing flow
 

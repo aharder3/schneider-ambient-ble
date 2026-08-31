@@ -15,7 +15,7 @@
       },
       "select_device": {
         "title": "Select Bluetooth device",
-        "description": "**Always manually select** the Bluetooth device that belongs to the Schneider/WSC mirror cabinet. This picker is shown both for user-started setup and when Home Assistant already discovered WSC over Bluetooth. All connectable devices currently present in Home Assistant’s Bluetooth cache are listed. Schneider/WSC matches are marked with ✓ and sorted first. If the cabinet is missing, choose Scan again for an active scan.",
+        "description": "**Always manually select** the Bluetooth device that belongs to the Schneider/WSC mirror cabinet. This picker is shown both for user-started setup and when Home Assistant already discovered WSC over Bluetooth. All connectable devices currently present in Home Assistant’s Bluetooth cache are listed. Schneider/WSC matches are marked with ✓ and sorted first. If the cabinet is missing, choose Scan again for an active scan. A rescan takes about 8 seconds; after it finishes the device picker is shown again.",
         "data": {
           "address": "Bluetooth device"
         }

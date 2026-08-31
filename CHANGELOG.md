@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.7
+
+- Fixed the manual Bluetooth picker defaulting to **Scan again**, which could make setup look like an endless rescan loop.
+- Real Bluetooth devices are now sorted first and the best Schneider/WSC match is explicitly preselected.
+- **Scan again / Erneut suchen** is now the final picker item instead of the default.
+- A failed active rescan keeps the previous Bluetooth cache instead of replacing the picker with an empty list.
+- Clarified in the setup text that an active rescan takes about eight seconds.
+
 ## 0.2.6
 
 - Fixed setup started from Home Assistant Bluetooth discovery: it now shows the same mandatory manual Bluetooth-device picker as user-started setup instead of bypassing directly to the discovered WSC.
