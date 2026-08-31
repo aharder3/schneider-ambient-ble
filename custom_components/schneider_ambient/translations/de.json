@@ -14,10 +14,10 @@
         "description": "**{name}** einrichten? Home Assistant stellt zuerst die Bluetooth-/GATT-Verbindung her."
       },
       "select_device": {
-        "title": "Schneider/WSC-Gerät auswählen",
-        "description": "Mehrere kompatible Geräte wurden gefunden. Wähle den gewünschten Spiegelschrank aus.",
+        "title": "Bluetooth-Gerät auswählen",
+        "description": "Wähle manuell das Bluetooth-Gerät aus, das zu deinem Schneider/WSC-Spiegelschrank gehört. Es werden alle aktuell in Home Assistant sichtbaren, verbindbaren Bluetooth-Geräte angezeigt. Bereits eindeutig als Schneider/WSC erkannte Geräte sind mit ✓ markiert und stehen oben. Fehlt der Spiegelschrank, wähle „Erneut suchen“.",
         "data": {
-          "address": "Gerät"
+          "address": "Bluetooth-Gerät"
         }
       },
       "press_button": {
@@ -25,8 +25,8 @@
         "description": "Home Assistant ist bereits mit dem Schneider/WSC-Spiegelschrank verbunden und hat bestätigt, dass C6 noch nicht autorisiert ist. **Drücke jetzt die physische Pairing-/Anlerntaste an der Leuchte bzw. am Spiegelschrank.** Klicke erst danach auf **Weiter**. Home Assistant prüft anschließend, ob C6 auf `0x55` gewechselt hat."
       },
       "no_devices": {
-        "title": "Kein Schneider/WSC-Gerät gefunden",
-        "description": "Es wurde kein verbindbarer Schneider/WSC-Spiegelschrank gefunden. Prüfe Stromversorgung, Reichweite und ESPHome Bluetooth Proxy und versuche es erneut."
+        "title": "Keine verbindbaren Bluetooth-Geräte gefunden",
+        "description": "Home Assistant sieht aktuell keine verbindbaren Bluetooth-Geräte. Prüfe Bluetooth/Proxy und Reichweite und starte die Suche erneut."
       },
       "connect_failed": {
         "title": "Schneider/WSC-Verbindung konnte nicht vorbereitet werden",
@@ -43,6 +43,16 @@
       "sync_failed": {
         "title": "Synchronisierung nach der Freigabe fehlgeschlagen",
         "description": "C6 hat den physischen Tastendruck bestätigt, aber Statusabfragen oder Datum-/Uhrzeit-Synchronisierung schlugen fehl. Wiederhole die Einrichtung.\\n\\nTechnisches Detail: `{error}`"
+      },
+      "name": {
+        "title": "Gerätenamen festlegen",
+        "description": "Lege fest, unter welchem Namen der Spiegelschrank in Home Assistant angezeigt werden soll. Die Entitäten werden diesem Gerät zugeordnet, z. B. **Bad Spiegelschrank Licht oben**.",
+        "data": {
+          "display_name": "Name"
+        },
+        "data_description": {
+          "display_name": "Frei wählbarer Name für den Schneider/WSC-Spiegelschrank in Home Assistant."
+        }
       }
     },
     "abort": {
@@ -51,6 +61,9 @@
     },
     "create_entry": {
       "success": "**{name}** wurde erfolgreich mit Schneider Ambient BLE eingerichtet."
+    },
+    "error": {
+      "invalid_name": "Gib einen gültigen Namen mit mindestens einem Buchstaben oder einer Zahl und maximal 64 Zeichen ein."
     }
   },
   "entity": {

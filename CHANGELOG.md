@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.5
+
+- Manual setup now always shows a Bluetooth-device picker instead of silently auto-selecting the only WSC candidate.
+- The picker lists **all connectable Bluetooth devices** currently visible to Home Assistant; advertisements already matching Schneider/WSC are marked with `✓` and sorted first.
+- Added an **Erneut suchen / Scan again** choice directly in the Bluetooth picker.
+- A manually selected device is validated by the real proprietary WSC GATT reads (C1/C6), so setup can still work when a proxy provides incomplete advertisement metadata.
+- Device naming still happens before the slower GATT authorization connection is opened.
+
+## 0.2.4
+
+- Added a dedicated setup step to choose the Home Assistant device name before the Bluetooth/GATT authorization starts.
+- The chosen name becomes the config-entry title and device-registry name, so entities are naturally grouped below names such as `Bad Spiegelschrank`.
+- The name field is pre-filled with `Schneider Ambient`, accepts up to 64 characters, and is validated before the BLE connection is opened.
+
 ## 0.2.3
 
 - Added a reusable runtime GATT connection with a 120-second idle timeout. The direct macOS latency benchmark measured WSC reconnects at roughly 3.8-6.0 seconds, while writes on an already-open connection completed in roughly 30-240 ms.

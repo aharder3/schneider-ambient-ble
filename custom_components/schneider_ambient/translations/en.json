@@ -14,10 +14,10 @@
         "description": "Set up **{name}**? Home Assistant will first establish the Bluetooth/GATT connection."
       },
       "select_device": {
-        "title": "Select Schneider/WSC device",
-        "description": "More than one compatible device was discovered. Select the cabinet you want to add.",
+        "title": "Select Bluetooth device",
+        "description": "Select the Bluetooth device that belongs to the Schneider/WSC mirror cabinet. All connectable Bluetooth devices currently visible to Home Assistant are listed. Devices whose advertisement already matches Schneider/WSC are marked with ✓ and sorted first. If the cabinet is missing, choose Scan again.",
         "data": {
-          "address": "Device"
+          "address": "Bluetooth device"
         }
       },
       "press_button": {
@@ -25,8 +25,8 @@
         "description": "Home Assistant is already connected to the Schneider/WSC cabinet and has confirmed the initial C6 state is not authorized. **Now press the physical pairing/learn button on the light or mirror cabinet.** After pressing the physical button, click **Continue**. Home Assistant will then verify that C6 changed to `0x55`."
       },
       "no_devices": {
-        "title": "No Schneider/WSC device found",
-        "description": "No connectable Schneider/WSC cabinet was found. Check power, range and the ESPHome Bluetooth Proxy, then retry."
+        "title": "No connectable Bluetooth devices found",
+        "description": "Home Assistant currently sees no connectable Bluetooth devices. Check Bluetooth/proxy availability and range, then retry the scan."
       },
       "connect_failed": {
         "title": "Could not prepare the Schneider/WSC connection",
@@ -43,6 +43,16 @@
       "sync_failed": {
         "title": "Post-authorization synchronization failed",
         "description": "C6 confirmed the physical button, but the post-authorization reads or date/time synchronization failed. Retry the full setup.\\n\\nTechnical detail: `{error}`"
+      },
+      "name": {
+        "title": "Choose device name",
+        "description": "Choose the name this mirror cabinet should use in Home Assistant. Its entities will be attached to this device, for example **Bathroom Mirror Upper light**.",
+        "data": {
+          "display_name": "Name"
+        },
+        "data_description": {
+          "display_name": "Custom Home Assistant name for the Schneider/WSC mirror cabinet."
+        }
       }
     },
     "abort": {
@@ -51,6 +61,9 @@
     },
     "create_entry": {
       "success": "**{name}** was successfully configured with Schneider Ambient BLE."
+    },
+    "error": {
+      "invalid_name": "Enter a valid name containing at least one letter or number and no more than 64 characters."
     }
   },
   "entity": {

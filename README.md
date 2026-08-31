@@ -26,7 +26,7 @@ The second PacketLogger capture confirms that manual mode stores the two-light m
 
 > **Status:** reverse-engineering project. Color temperature is independently real-hardware verified. Separate-zone C6 values and the Automatic/HCL `0x02` format are directly observed in the official-app capture. The immediate Night-light C6 state is implemented from the capture and should still be treated as experimental until independently replayed from macOS.
 >
-> **Current integration version: 0.2.3.** Home Assistant exposes one master light, two on/off-only zone lights, an Automatic/HCL switch and a Night-light switch.
+> **Current integration version: 0.2.5.** Manual setup always presents a Bluetooth-device picker, then lets you choose the device name before physical authorization. Runtime control exposes two zone lights with shared brightness/color temperature, Automatic/HCL and Night-light.
 
 [![Open your Home Assistant instance and open HACS repository](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=aharder3&repository=schneider-ambient-ble&category=integration)
 
@@ -69,20 +69,25 @@ When updating an existing development install, use **Redownload** in HACS and ve
 contains:
 
 ```json
-"version": "0.2.3"
+"version": "0.2.5"
 ```
 
 ## Home Assistant controls
 
-After setup the device page should contain five active controls:
+After setup the device page should contain four active controls:
 
-1. **Schneider Ambient** (`light`) — master on/off, global brightness and 2000–6500 K color temperature.
-2. **Upper light** (`light`) — on/off only.
-3. **Lower light** (`light`) — on/off only.
-4. **Automatic / HCL** (`switch`) — changes between manual and captured HCL mode while preserving the current zone mask.
-5. **Night light** (`switch`) — activates/deactivates the captured night-light mode.
+1. **Upper light** (`light`) — separate on/off, plus the cabinet's shared 1–100 % brightness and 2000–6500 K color temperature.
+2. **Lower light** (`light`) — separate on/off, plus the same shared brightness and color temperature.
+3. **Automatic / HCL** (`switch`) — changes between manual and captured HCL mode while preserving the current zone mask.
+4. **Night light** (`switch`) — activates/deactivates the captured night-light mode.
 
-Brightness and color temperature are intentionally only present on the master light because the tested cabinet applies those values globally to both main lights. The old development entities `Brightness`, `Color temperature` and `Power (experimental)` are removed from the entity registry so they do not remain as duplicates.
+Brightness and color temperature are hardware-global values. They are shown on both zone light entities for a natural Home Assistant light-card experience; changing either one updates the shared cabinet value and both HA entities stay synchronized.
+
+## Manual Bluetooth selection during setup
+
+Starting with 0.2.5, a user-initiated setup performs an active scan and **always shows a manual Bluetooth-device picker**. All connectable devices currently visible through Home Assistant's local adapters and Bluetooth proxies are listed. Known WSC advertisements are marked with `✓` and sorted first, but the flow intentionally allows selecting another entry because some proxy paths can expose incomplete advertisement metadata. The selected device is then validated by opening GATT and reading the proprietary WSC C1/C6 characteristics.
+
+The device-name step follows the Bluetooth selection and still occurs before the slower GATT authorization connection is opened.
 
 
 ## Real-hardware protocol sweep (v0.2.2)
@@ -125,6 +130,10 @@ Keep Wi-Fi credentials, API keys and OTA passwords in your local `secrets.yaml`;
 ### Home Assistant setup behavior
 
 Version 0.2.1 retains the physical authorization as a normal Home Assistant form instead of a background progress message. The form is only shown after the Bluetooth/GATT connection is established and C1 plus the initial non-authorized C6 value have been read successfully. The user then presses the physical cabinet button and clicks **Continue**; Home Assistant verifies C6=`0x55` before running the post-authorization reads and clock sync.
+
+## Device name during setup
+
+Before Home Assistant opens the Bluetooth/GATT authorization connection, the setup flow asks for a device name. The default is `Schneider Ambient`, but it can be changed to a room/device name such as `Bad Spiegelschrank`. That title is used for the Home Assistant config entry and device registry; the upper/lower light entities remain attached to the named device.
 
 ## First authorization / pairing flow
 

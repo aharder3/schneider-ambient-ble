@@ -23,7 +23,9 @@ from .helpers import DEFAULT_DEVICE_NAME, normalize_device_name
 
 _LOGGER = logging.getLogger(__name__)
 
-DISCOVERY_SCAN_SECONDS = 10.0
+DISCOVERY_SCAN_SECONDS = 8.0
+CONF_DISPLAY_NAME = "display_name"
+RESCAN_OPTION = "__rescan__"
 
 
 def _device_name(discovery_info: BluetoothServiceInfoBleak) -> str:
@@ -50,6 +52,7 @@ class SchneiderAmbientConfigFlow(ConfigFlow, domain=DOMAIN):
         self._sync_task: asyncio.Task[None] | None = None
         self._setup_client: BleakClientWithServiceCache | None = None
         self._last_error = "No additional error information"
+        self._configured_name: str | None = None
 
     @override
     async def async_step_bluetooth(
@@ -69,8 +72,7 @@ class SchneiderAmbientConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> ConfigFlowResult:
         assert self._discovery_info is not None
         if user_input is not None:
-            self._connect_task = None
-            return await self.async_step_connect()
+            return await self.async_step_name()
 
         self._set_confirm_only()
         return self.async_show_form(
@@ -90,6 +92,13 @@ class SchneiderAmbientConfigFlow(ConfigFlow, domain=DOMAIN):
         return await self.async_step_scan()
 
     async def _async_scan_for_devices(self) -> None:
+        """Collect all connectable Bluetooth devices visible to Home Assistant.
+
+        Manual setup deliberately does not pre-filter the list to WSC advertising.
+        Some proxies/adapters can expose a device without the local name or service UUID
+        being present in the latest advertisement. The selected device is validated by
+        the real WSC GATT reads during the following connection step instead.
+        """
         await bluetooth.async_request_active_scan(
             self.hass, duration=DISCOVERY_SCAN_SECONDS
         )
@@ -99,9 +108,18 @@ class SchneiderAmbientConfigFlow(ConfigFlow, domain=DOMAIN):
         ):
             if discovery_info.address in found:
                 continue
-            if _is_supported(discovery_info):
-                found[discovery_info.address] = discovery_info
+            found[discovery_info.address] = discovery_info
         self._discovered_devices = found
+
+    @staticmethod
+    def _device_choice_label(discovery_info: BluetoothServiceInfoBleak) -> str:
+        """Return a useful label for the manual Bluetooth picker."""
+        raw_name = (discovery_info.name or "").strip()
+        name = raw_name if raw_name else "Unknown Bluetooth device"
+        prefix = "✓ Schneider/WSC — " if _is_supported(discovery_info) else ""
+        rssi = getattr(discovery_info, "rssi", None)
+        suffix = f" — {rssi} dBm" if isinstance(rssi, (int, float)) else ""
+        return f"{prefix}{name} ({discovery_info.address}){suffix}"
 
     async def async_step_scan(
         self, user_input: dict[str, Any] | None = None
@@ -127,21 +145,30 @@ class SchneiderAmbientConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_select_device(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
+        """Always show a manual Bluetooth device picker."""
         if not self._discovered_devices:
             return await self.async_step_no_devices()
 
         if user_input is not None:
-            return await self._async_use_selected_address(user_input[CONF_ADDRESS])
+            selected = user_input[CONF_ADDRESS]
+            if selected == RESCAN_OPTION:
+                self._scan_task = None
+                self._discovered_devices = {}
+                return await self.async_step_scan()
+            return await self._async_use_selected_address(selected)
 
-        if len(self._discovered_devices) == 1:
-            return await self._async_use_selected_address(
-                next(iter(self._discovered_devices))
-            )
+        def sort_key(item: tuple[str, BluetoothServiceInfoBleak]) -> tuple[int, float, str]:
+            _address, info = item
+            supported_rank = 0 if _is_supported(info) else 1
+            rssi = getattr(info, "rssi", None)
+            signal_rank = -float(rssi) if isinstance(rssi, (int, float)) else 9999.0
+            name = (info.name or "").casefold()
+            return supported_rank, signal_rank, name
 
-        choices = {
-            address: f"{_device_name(info)} ({address})"
-            for address, info in self._discovered_devices.items()
-        }
+        choices: dict[str, str] = {RESCAN_OPTION: "↻ Scan again / Erneut suchen"}
+        for address, info in sorted(self._discovered_devices.items(), key=sort_key):
+            choices[address] = self._device_choice_label(info)
+
         return self.async_show_form(
             step_id="select_device",
             data_schema=vol.Schema({vol.Required(CONF_ADDRESS): vol.In(choices)}),
@@ -153,15 +180,51 @@ class SchneiderAmbientConfigFlow(ConfigFlow, domain=DOMAIN):
             discovery_info = bluetooth.async_last_service_info(
                 self.hass, address, connectable=True
             )
-        if discovery_info is None or not _is_supported(discovery_info):
+        if discovery_info is None:
             return await self.async_step_no_devices()
 
+        # Do not reject a manually selected device solely because its latest
+        # advertisement is missing WSC/local-name or service-UUID metadata. The
+        # next step validates the device by connecting and reading the proprietary
+        # C1/C6 characteristics. This makes manual selection useful with proxies
+        # that expose incomplete advertisements.
         await self.async_set_unique_id(address, raise_on_progress=False)
         self._abort_if_unique_id_configured()
         self._discovery_info = discovery_info
-        self.context["title_placeholders"] = {"name": _device_name(discovery_info)}
-        self._connect_task = None
-        return await self.async_step_connect()
+        suggested = _device_name(discovery_info) if _is_supported(discovery_info) else DEFAULT_DEVICE_NAME
+        self.context["title_placeholders"] = {"name": suggested}
+        return await self.async_step_name()
+
+    async def async_step_name(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Let the user choose the Home Assistant device name before BLE setup."""
+        assert self._discovery_info is not None
+
+        suggested_name = self._configured_name or DEFAULT_DEVICE_NAME
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            entered_name = str(user_input.get(CONF_DISPLAY_NAME, "")).strip()
+            if (
+                not entered_name
+                or len(entered_name) > 64
+                or not any(character.isalnum() for character in entered_name)
+            ):
+                errors[CONF_DISPLAY_NAME] = "invalid_name"
+            else:
+                self._configured_name = entered_name
+                self.context["title_placeholders"] = {"name": entered_name}
+                self._connect_task = None
+                return await self.async_step_connect()
+
+        return self.async_show_form(
+            step_id="name",
+            data_schema=vol.Schema(
+                {vol.Required(CONF_DISPLAY_NAME, default=suggested_name): str}
+            ),
+            errors=errors,
+        )
 
     async def _async_close_setup_client(self) -> None:
         client = self._setup_client
@@ -211,6 +274,11 @@ class SchneiderAmbientConfigFlow(ConfigFlow, domain=DOMAIN):
                 )
         except Exception as err:  # noqa: BLE001
             self._last_error = f"{type(err).__name__}: {err}"
+            if self._discovery_info is not None and not _is_supported(self._discovery_info):
+                self._last_error += (
+                    ". The device was selected manually and did not advertise as WSC; "
+                    "verify that the selected Bluetooth device is the Schneider mirror cabinet"
+                )
             _LOGGER.exception("Could not prepare Schneider/WSC authorization")
             await self._async_close_setup_client()
             return self.async_show_progress_done(next_step_id="connect_failed")
@@ -308,7 +376,9 @@ class SchneiderAmbientConfigFlow(ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         assert self._discovery_info is not None
-        title = _device_name(self._discovery_info)
+        title = normalize_device_name(
+            self._configured_name or _device_name(self._discovery_info)
+        )
         self.context["title_placeholders"] = {"name": title}
         await self._async_close_setup_client()
         return self.async_create_entry(
