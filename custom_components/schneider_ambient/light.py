@@ -12,7 +12,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, ZONE_LOWER, ZONE_UPPER
+from .const import DOMAIN, ZONE_ALL, ZONE_LOWER, ZONE_UPPER
 from .device import SchneiderAmbientDevice
 
 
@@ -33,6 +33,7 @@ async def async_setup_entry(
         [
             SchneiderZoneLight(entry, device, ZONE_UPPER, "upper_light"),
             SchneiderZoneLight(entry, device, ZONE_LOWER, "lower_light"),
+            SchneiderZoneLight(entry, device, ZONE_ALL, "all_light"),
         ]
     )
 
