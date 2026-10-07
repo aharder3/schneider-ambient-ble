@@ -69,7 +69,7 @@ When updating an existing development install, use **Redownload** in HACS and ve
 contains:
 
 ```json
-"version": "0.2.7"
+"version": "0.2.8"
 ```
 
 ## Home Assistant controls

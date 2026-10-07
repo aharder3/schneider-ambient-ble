@@ -2,7 +2,7 @@
 
 Independent Home Assistant alternative for the core Bluetooth lighting controls of the [Schneider Ambient Lighting App](https://www.wschneider.com/ch/de/wussten-sie/licht-sich-wohlfuehlen-im-raum/schneider-app/).
 
-Current integration version: **0.2.1**.
+Current integration version: **0.2.8**.
 
 ## Home Assistant controls
 
@@ -23,9 +23,9 @@ The real cabinet was independently verified from macOS with this order: connect 
 See [Pairing / first authorization](pairing.md) and [Protocol notes](protocol.md).
 
 
-## v0.2.1 controls
+## v0.2.8 controls
 
-- Master light: both main lights, global brightness and color temperature.
+- All lights: both main lights, global brightness and color temperature.
 - Upper light: separate on/off.
 - Lower light: separate on/off.
 - Automatic / HCL: captured C6 `0x02` mode.
