@@ -12,9 +12,9 @@ The official app remains the reference implementation and may expose additional 
 
 ## Confirmed / implemented controls
 
-Version 0.2.1 exposes the controls observed on a two-light Schneider/WSC cabinet:
+Version 0.2.8 exposes the controls observed on a two-light Schneider/WSC cabinet:
 
-- **Master light**: both main lights on/off together, global brightness and global tunable-white color temperature.
+- **All lights**: both main lights on/off together, global brightness and global tunable-white color temperature.
 - **Upper light**: separate on/off only.
 - **Lower light**: separate on/off only.
 - **Brightness**: 10–100 % through the normal HA light brightness control; it applies to both main lights.
@@ -26,7 +26,7 @@ The second PacketLogger capture confirms that manual mode stores the two-light m
 
 > **Status:** reverse-engineering project. Color temperature is independently real-hardware verified. Separate-zone C6 values and the Automatic/HCL `0x02` format are directly observed in the official-app capture. The immediate Night-light C6 state is implemented from the capture and should still be treated as experimental until independently replayed from macOS.
 >
-> **Current integration version: 0.2.7.** Both manual setup and Home Assistant Bluetooth-discovery setup now require an explicit Bluetooth-device selection, followed by the custom device name. An already-present C6=`0x55` authorization marker is handled as an existing authorization instead of an error. Runtime control exposes two zone lights with shared brightness/color temperature, Automatic/HCL and Night-light.
+> **Current integration version: 0.2.8.** Both manual setup and Home Assistant Bluetooth-discovery setup now require an explicit Bluetooth-device selection, followed by the custom device name. An already-present C6=`0x55` authorization marker is handled as an existing authorization instead of an error. Runtime control exposes two zone lights and a combined All lights entity, with shared brightness/color temperature, Automatic/HCL and Night-light.
 
 [![Open your Home Assistant instance and open HACS repository](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=aharder3&repository=schneider-ambient-ble&category=integration)
 
