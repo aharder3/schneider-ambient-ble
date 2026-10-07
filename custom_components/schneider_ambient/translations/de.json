@@ -77,6 +77,9 @@
       },
       "lower_light": {
         "name": "Licht unten"
+      },
+      "all_light": {
+        "name": "Alle Lichter"
       }
     },
     "switch": {
