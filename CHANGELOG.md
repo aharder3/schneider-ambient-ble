@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.9
+
+- Keep the runtime BLE/GATT connection open without an inactivity timeout to avoid unnecessary reconnects during normal operation.
+- Retain automatic retry/reconnect behavior on dropped links and disconnect cleanly when unloading the integration.
+- The cabinet must remain powered to benefit from connection reuse; an open connection occupies one Bluetooth proxy slot.
+
 ## 0.2.7
 
 - Fixed the manual Bluetooth picker defaulting to **Scan again**, which could make setup look like an endless rescan loop.
