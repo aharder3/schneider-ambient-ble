@@ -12,7 +12,7 @@ The official app remains the reference implementation and may expose additional 
 
 ## Confirmed / implemented controls
 
-Version 0.2.8 exposes the controls observed on a two-light Schneider/WSC cabinet:
+Version 0.2.9 exposes the controls observed on a two-light Schneider/WSC cabinet:
 
 - **All lights**: both main lights on/off together, global brightness and global tunable-white color temperature.
 - **Upper light**: separate on/off only.
@@ -26,7 +26,7 @@ The second PacketLogger capture confirms that manual mode stores the two-light m
 
 > **Status:** reverse-engineering project. Color temperature is independently real-hardware verified. Separate-zone C6 values and the Automatic/HCL `0x02` format are directly observed in the official-app capture. The immediate Night-light C6 state is implemented from the capture and should still be treated as experimental until independently replayed from macOS.
 >
-> **Current integration version: 0.2.8.** Both manual setup and Home Assistant Bluetooth-discovery setup now require an explicit Bluetooth-device selection, followed by the custom device name. An already-present C6=`0x55` authorization marker is handled as an existing authorization instead of an error. Runtime control exposes two zone lights and a combined All lights entity, with shared brightness/color temperature, Automatic/HCL and Night-light.
+> **Current integration version: 0.2.9.** Both manual setup and Home Assistant Bluetooth-discovery setup now require an explicit Bluetooth-device selection, followed by the custom device name. An already-present C6=`0x55` authorization marker is handled as an existing authorization instead of an error. Runtime control exposes two zone lights and a combined All lights entity, with shared brightness/color temperature, Automatic/HCL and Night-light.
 
 [![Open your Home Assistant instance and open HACS repository](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=aharder3&repository=schneider-ambient-ble&category=integration)
 
@@ -69,7 +69,7 @@ When updating an existing development install, use **Redownload** in HACS and ve
 contains:
 
 ```json
-"version": "0.2.8"
+"version": "0.2.9"
 ```
 
 ## Home Assistant controls
@@ -107,7 +107,7 @@ Brightness and colour temperature are global hardware settings. Home Assistant e
 
 ## Runtime latency optimization
 
-Direct macOS benchmarking on the tested WSC showed that the expensive part of an interactive Home Assistant command is establishing a new GATT connection: approximately 3.8-6.0 seconds per reconnect in the test, versus roughly 30-240 ms for writes on an already-open connection. Version 0.2.3 therefore keeps the runtime BLE connection alive for 120 seconds after the most recent command and reuses the initialized manual session for slider bursts. A dropped proxy/peripheral connection still triggers a fresh whole-operation retry.
+Direct macOS benchmarking on the tested WSC showed that the expensive part of an interactive Home Assistant command is establishing a new GATT connection: approximately 3.8-6.0 seconds per reconnect in the test, versus roughly 30-240 ms for writes on an already-open connection. Version 0.2.3 introduced a reusable runtime BLE connection. Starting with version 0.2.9, the connection remains open without an inactivity timeout (as long as the proxy and peripheral keep it connected), and the initialized manual session is reused for slider bursts. A dropped proxy/peripheral connection still triggers a fresh whole-operation retry on the next command; unloading the integration disconnects cleanly. Keeping a GATT connection open occupies a Bluetooth proxy connection slot.
 
 The benchmark tool is available as `tools/wsc_latency_test.py`.
 
