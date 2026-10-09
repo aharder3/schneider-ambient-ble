@@ -218,7 +218,8 @@ class SchneiderBleClient:
                 try:
                     client = await self._runtime_connection()
                     result = await operation(client)
-                    self._arm_idle_disconnect(client)
+                    # Keep the live BLE connection to avoid slow reconnects.
+                    # It is still closed on errors or when the integration unloads.
                     return result
                 except BLEAK_RETRY_EXCEPTIONS as exc:
                     last_exc = exc
